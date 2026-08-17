@@ -1,419 +1,422 @@
-# SpeakLab · 开口录音棚 🎙️
+# SpeakLab · Voice Studio 🎙️
 
-> 一间开在浏览器里的英语口语录音棚：逐句跟读、逐词发音标注、三维评分与声波对比；音标闯关、场景对话、AI 追问；每句成绩都有记忆，每天打卡有回响。单文件、零依赖、双击即开——所有练习数据只留在你自己的浏览器里。
+> A voice studio that lives in your browser: sentence shadowing with per-word pronunciation feedback, three-dimensional scoring and waveform comparison; phoneme gauntlet, scenario conversations, AI follow-up questions; every score is remembered, every day is checked in. Single file, zero dependencies, double-click to run — all practice data stays in your own browser.
 
-![技术栈](https://img.shields.io/badge/技术-原生%20HTML%2FCSS%2FJS-orange)
-![依赖](https://img.shields.io/badge/依赖-前端零第三方库-brightgreen)
-![形式](https://img.shields.io/badge/形式-单文件%20index.html-blue)
-![语音](https://img.shields.io/badge/语音-Web%20Speech%20API%20%2B%20可选%20本地%20Whisper-9cf)
-![测试](https://img.shields.io/badge/自动化测试-214%20项断言-success)
-![版本](https://img.shields.io/badge/版本-v2.0-lightgrey)
+> **中文文档：[README.zh-CN.md](README.zh-CN.md)**
+
+![Stack](https://img.shields.io/badge/Stack-Vanilla%20HTML%2FCSS%2FJS-orange)
+![Dependencies](https://img.shields.io/badge/Frontend-Zero%20third-party%20libs-brightgreen)
+![Form](https://img.shields.io/badge/Form-Single%20file%20index.html-blue)
+![Speech](https://img.shields.io/badge/Speech-Web%20Speech%20API%20%2B%20optional%20local%20Whisper-9cf)
+![Tests](https://img.shields.io/badge/Automated%20tests-214%20assertions-success)
+![Version](https://img.shields.io/badge/Version-v2.0-lightgrey)
 
 ---
 
-## 目录
+## Table of Contents
 
-1. [项目简介与需求演进](#项目简介与需求演进)
-2. [功能一览](#功能一览)
-3. [快速开始](#快速开始)
-4. [使用说明](#使用说明)
-5. [设计系统](#设计系统)
-6. [技术架构](#技术架构)
-7. [本地评分算法](#本地评分算法)
-8. [兼容矩阵与边界处理](#兼容矩阵与边界处理)
-9. [隐私说明](#隐私说明)
-10. [测试与验证](#测试与验证)
-11. [完整开发历程](#完整开发历程)
-12. [内容库规模](#内容库规模)
-13. [项目结构](#项目结构)
-14. [已知限制](#已知限制)
-15. [后续可扩展方向](#后续可扩展方向)
+1. [Introduction & Evolution](#introduction--evolution)
+2. [Features](#features)
+3. [Quick Start](#quick-start)
+4. [Usage Guide](#usage-guide)
+5. [Design System](#design-system)
+6. [Technical Architecture](#technical-architecture)
+7. [Scoring Algorithms](#scoring-algorithms)
+8. [Compatibility & Edge Cases](#compatibility--edge-cases)
+9. [Privacy](#privacy)
+10. [Testing & Verification](#testing--verification)
+11. [Development History](#development-history)
+12. [Content Library](#content-library)
+13. [Project Structure](#project-structure)
+14. [Known Limitations](#known-limitations)
+15. [Roadmap](#roadmap)
 16. [License](#license)
 
 ---
 
-## 项目简介与需求演进
+## Introduction & Evolution
 
-SpeakLab 是一个面向中国英语学习者的口语练习网页，融合了市面上主流口语产品的核心玩法：
+SpeakLab is an English speaking practice web app for Chinese learners, combining the core gameplay of mainstream speaking products:
 
-| 参考来源 | 借鉴点 |
+| Reference | Borrowed from |
 |---|---|
-| 英语流利说 | 跟读打分三维度（准确度/流利度/完整度）、逐词红黄绿标注、录音回放 |
-| ELSA Speak | 发音反馈可视化、每日短句、音标课程、Speech Analyzer 式自由表达分析 |
-| Speak | AI 场景角色扮演、对话中纠错、跟读复述环节 |
-| 多邻国 | 连续天数（streak）、打卡、游戏化正反馈 |
-| Hibay / 火花口语等国内 App | 场景陪练 + 「提示词 / 中文翻译」辅助按钮 |
-| GitHub：IELTS-Speaking-AI / AI_VoiceCoach / FluentLoop | 语音识别 + 评分 + 本地历史；发音分析与纠错 |
+| Liulishuo (英语流利说) | 3-dimension shadowing scores (accuracy/fluency/completeness), per-word red/yellow/green coloring, playback |
+| ELSA Speak | Pronunciation feedback visualization, daily short sentences, phoneme courses |
+| Speak | AI role-play conversations, in-conversation corrections, listen & repeat |
+| Duolingo | Streaks, check-ins, gamified feedback |
+| Hibay & similar CN apps | Scenario practice with "hint / translation" helper buttons |
+| GitHub: IELTS-Speaking-AI / AI_VoiceCoach / FluentLoop | ASR + scoring + local history; pronunciation analysis & correction |
 
-**需求演进一句话总览**（完整逐版本记录见[完整开发历程](#完整开发历程)）：
+**Evolution at a glance** (full version-by-version record in [Development History](#development-history)):
 
 ```
-跟读打分 + 场景对话 ──► 单词本/统计/跟读复述/Whisper 引擎 ──► 音标卡 + 打卡窗口
-    ──► 句子成绩记忆 ──► 英音美音 ──► 智能问答（追问不卡人）──► 三级难度语料
-    ──► 背景漂浮名言 ──► 音标闯关 + 停顿自动评分 ──► 严格评分体系（v2.0）
+Shadowing + scenario chat ──► word book / stats / listen&repeat / Whisper engine ──► phoneme cards + daily check-in
+    ──► per-sentence score memory ──► US/UK accents ──► smart Q&A (never blocks) ──► 3-level corpus
+    ──► floating background quotes ──► phoneme gauntlet + auto-score on silence ──► strict scoring system (v2.0)
 ```
 
-当前形态是**四大训练模块 + 一套学习闭环**：
+Four training modules + one learning loop:
 
-- **跟读台**：跟读一句 → 评分 → 逐词发音色块 + 三维仪表 + 目标节奏谱与你的录音波形上下对比；点任意单词听慢速发音，红/黄词自动进易错词单词本；每句成绩都有记忆（最好/上次/次数），练完即时对比（新纪录庆祝 / 较上次增减）。
-- **对话台**：6 个场景 × 两种方式：**智能问答**（默认，助手一个问题接一个问题追问，怎么回答都继续）与**引导式模板**（剧本逐句练习）；可选跟读复述；填入 LLM Key 后智能问答升级为 **AI 自由追问**。
-- **音标学习卡**：44 个国际音标——自由浏览（发音要领 + 例词点读 + 跟读判定）与**闯关模式**（难度递进、每关 3 次过关解锁）。
-- **统计 + 打卡 + 记忆**：热力图、成绩趋势、每日目标、打卡窗口、句子成绩本，构成完整的日常学习闭环。
+- **Shadowing Studio**: read a sentence → get scored → per-word color chips + 3-dimension meters + your real waveform compared against the target rhythm; tap any word to hear it slowly; red/yellow words are auto-collected into a mistake word book; every sentence remembers your best/last score.
+- **Conversation Studio**: 6 scenarios × two modes: **Smart Q&A** (default — the assistant keeps asking questions; any answer moves the conversation forward) and **Guided Script** (practice line by line); optional listen & repeat; with an LLM key, Smart Q&A upgrades to **AI follow-up questions**.
+- **Phoneme Cards**: 44 IPA phonemes — free browsing (pronunciation tips + example words + shadowing check) and a **Gauntlet mode** (increasing difficulty, each gate needs 3 passes to unlock).
+- **Stats + Check-in + Memory**: heatmap, score trends, daily goal, check-in window, sentence score book — a complete daily practice loop.
 
-**双识别引擎**：默认浏览器内置识别（零配置）；可选随附的**本地 Whisper 后端**——完全离线转写、词级时间戳与音素词典对比，评分更接近真实发音。
+**Dual ASR engines**: browser built-in recognition (zero config) by default; optional bundled **local Whisper backend** — fully offline transcription, word-level timestamps and CMUdict phoneme comparison.
 
 ---
 
-## 功能一览
+## Features
 
-| 功能 | 说明 |
+| Feature | Description |
 |---|---|
-| 🎙 **逐句跟读** | 90 句语料：日常/旅行/职场/面试/通用 5 场景 × 初级/中级/高级三级难度，每句带中文释义与发音提示；场景与难度可独立筛选 |
-| 🔴🟡🟢 **逐词发音标注** | 识别结果与目标句词级对齐后逐词着色：绿=不错、黄=接近、红=读错/漏读，多读的词虚线框标出 |
-| 👆 **点词听发音** | 点击任意色块播放该词 0.55× 慢速发音；Whisper 引擎下词块悬停显示音标 |
-| 📕 **易错词单词本** | 红/黄词自动收录（同词累计次数）；首页可点读、可「重练」跳回原句（自动切到该句难度），读绿自动移除 |
-| 📊 **三维评分（严格标准）** | 准确度 / 流利度 / 完整度 + 总分；中级 ×0.97、高级 ×0.93 难度系数；Whisper 引擎附带真实语速标注 |
-| 🌊 **声波对比台** | 目标句按音节与重音渲染「节奏谱」，与你的真实录音波形上下对照 |
-| ▶ **示范朗读** | 浏览器 TTS 英文朗读逐词高亮；**美音/英音切换**（自动优选对应 voice，缺失自动回退） |
-| 🔁 **录音回放** | MediaRecorder 录音 + 实时电平表；20 秒上限；音标跟读支持**说完停顿约 2 秒自动评分** |
-| 💬 **场景对话** | 6 场景 × 双模式：**智能问答**（每场景 8 题题库、连续追问、任何回答都推进、命中率统计、题库循环）+ **引导式模板**（剧本对话树 + 答错兜底 + 建议按钮） |
-| 🎙 **对话跟读复述** | 每轮导师台词可先跟读打分（弹层内完成），气泡标注跟读分；可关闭 |
-| 🤖 **AI 自由追问（可选）** | OpenAI 兼容 LLM Key（DeepSeek/OpenAI/通义/智谱预设）；追问式面试官提示词 + 纠错卡 + 提示词 + 中文翻译 |
-| 🖥 **本地 Whisper 引擎（可选）** | `server/` 后端：离线转写 + 词级时间戳 + CMUdict 音素对比，支持国内镜像；不可用时自动回退浏览器识别 |
-| 🔤 **音标学习卡** | 44 个国际音标：分类浏览、中文发音要领、例词 IPA 高亮 + 慢速点读、跟读判定（浏览器词级 / Whisper 音素词典对比）、已练进度 |
-| 🏆 **音标闯关模式** | 44 音标按 5 个难度阶段递进；每关跟读通过 **3 次**过关并解锁下一关；进度条 + 百分比 + 路线图（已过 ✓/当前/锁定），持久化可重置 |
-| 📈 **学习统计页** | 连续天数/累计练习/近 30 次均分 + 12 周打卡热力图 + 成绩趋势曲线 + 每日目标进度与达成提醒 + 句子成绩本 |
-| 📅 **每日打卡窗口** | 首页自动弹出打卡卡片；顶栏 DAY 可随时唤出；连续 7/14/30/50/100 天里程碑庆祝 |
-| 💬 **背景漂浮名言** | 页面背景空处漂浮 2~3 条语言/学习主题名言（英文斜体 + 作者 + 小字中文翻译），缓慢浮动、错峰轮换；鼠标穿透、移动端收敛；`prefers-reduced-motion` 下静止 |
-| 🧠 **句子成绩记忆** | 每句记住最好/上次成绩与练习次数（localStorage 持久化）；练完即时对比；统计页「句子成绩本」全量浏览（最近/最弱排序）+ 一键重练 |
-| 📅 **练习历史** | 本地记录跟读/对话/音标练习，导出/导入 JSON、一键清空 |
-| 📱 **多端兼容** | 手机竖屏 / 平板 / 桌面响应式，触控 + 键盘可操作 |
-| ♿ **无障碍与动效** | `:focus-visible` 焦点环、`prefers-reduced-motion` 全量降级、`aria-live` 实时文本播报 |
+| 🎙 **Sentence shadowing** | 90-sentence corpus: 5 scenarios (Daily/Travel/Work/Interview/General) × 3 levels (Beginner/Intermediate/Advanced), each with Chinese gloss & pronunciation tip; independent scenario & level filters |
+| 🔴🟡🟢 **Per-word coloring** | Word-level alignment between recognition and target; green = good, yellow = close, red = wrong/missed; extra words marked with dashed border |
+| 👆 **Tap-to-hear** | Tap any word chip for 0.55× slow pronunciation; phoneme notation shown on hover with the Whisper engine |
+| 📕 **Mistake word book** | Red/yellow words auto-collected (same word accumulates); tap to hear, "re-practice" jumps back to the sentence (auto-switching to its level); removed once read green |
+| 📊 **3-dimension scoring (strict)** | Accuracy / Fluency / Completeness + total; level coefficients (Intermediate ×0.97, Advanced ×0.93); real speaking rate shown with Whisper |
+| 🌊 **Waveform compare stage** | Target sentence rendered as a rhythm spectrum (syllables & stress) vs. your actual recording waveform |
+| ▶ **Demo playback** | Browser TTS with word-by-word highlight; **US/UK accent switch** (prefers matching voices, falls back gracefully) |
+| 🔁 **Recording & playback** | MediaRecorder + live level meter; 20s cap; phoneme practice auto-scores after ~2s of silence |
+| 💬 **Scenario conversations** | 6 scenarios × 2 modes: **Smart Q&A** (8-question bank per scenario, endless follow-ups, any answer advances, hit-rate stats) + **Guided Script** (dialogue tree + fallback guidance + suggestion buttons) |
+| 🎙 **Listen & repeat in chat** | Each tutor line can be shadowed & scored inside a modal; score chip on the bubble; can be disabled |
+| 🤖 **AI follow-up questions (optional)** | OpenAI-compatible LLM key (DeepSeek/OpenAI/Qwen/GLM presets); interviewer-style system prompt + correction cards + hints + translation |
+| 🖥 **Local Whisper engine (optional)** | Bundled `server/`: offline transcription + word timestamps + CMUdict phoneme comparison, mirror-friendly for CN networks; auto-falls-back to browser ASR |
+| 🔤 **Phoneme cards** | 44 IPA phonemes: category browsing, Chinese articulation tips, IPA-highlighted example words with slow playback, shadowing check (browser word-level / Whisper phoneme-level), progress |
+| 🏆 **Phoneme gauntlet** | 44 gates across 5 difficulty stages; **3 passes unlock the next gate**; progress bar + percentage + road map (passed ✓/current/locked), persisted & resettable |
+| 📈 **Stats page** | Streak / total practice / last-30 average + 12-week heatmap + score trend curve + daily goal progress & celebration + sentence score book |
+| 📅 **Daily check-in window** | Auto-pops on the home page; DAY badge reopens it anytime; milestone celebrations at 7/14/30/50/100 days |
+| 💬 **Floating background quotes** | 2–3 watermark-style quotes float in empty background space (italic English + author + small Chinese translation), slow drift, staggered rotation; click-through; collapses to one on mobile; static under `prefers-reduced-motion` |
+| 🧠 **Sentence score memory** | Every sentence remembers best/last/count (persisted in localStorage); instant comparison after scoring (new record 🎉 / delta vs. last); "sentence score book" in stats (recent/weakest sort) + one-tap re-practice |
+| 📅 **Practice history** | Local records of shadowing/chats/phoneme practice; export/import JSON, one-click clear |
+| 📱 **Multi-device** | Responsive mobile/tablet/desktop; touch + keyboard operable |
+| ♿ **Accessibility & motion** | `:focus-visible` rings, full `prefers-reduced-motion` degradation, `aria-live` announcements |
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 方式一：直接双击（最简单，浏览器内置引擎）
+### Option 1: Double-click (simplest, browser engine)
 
-双击 `index.html`，在任意现代浏览器（Chrome / Edge / Safari）中打开即可。**无需安装、无需构建**（语音识别与 LLM 除外）。
+Double-click `index.html` and open it in any modern browser (Chrome / Edge / Safari). **No install, no build** (except ASR & LLM features).
 
-### 方式二：本地 HTTP 服务（推荐，手机一起练）
+### Option 2: Local HTTP server (recommended; use your phone too)
 
 ```bash
-# 在 speaklab 目录下任选其一
+# inside the speaklab folder, either:
 python -m http.server 8090 --directory .
-# 或
+# or
 npx serve -l 8090 .
 ```
 
-- 电脑访问：<http://127.0.0.1:8090/index.html>
-- 手机访问（同一 Wi-Fi）：`http://<电脑局域网IP>:8090/index.html`
+- Desktop: <http://127.0.0.1:8090/index.html>
+- Phone (same Wi-Fi): `http://<your-LAN-IP>:8090/index.html`
 
-### 方式三：本地 Whisper 引擎（离线转写 + 音素对比，可选）
+### Option 3: Local Whisper engine (offline transcription + phoneme comparison, optional)
 
 ```bash
 cd server
-npm install        # 安装依赖（@huggingface/transformers 等）
-npm start          # 启动 → http://127.0.0.1:8091
+npm install        # installs @huggingface/transformers etc.
+npm start          # starts → http://127.0.0.1:8091
 ```
 
-- 从 `http://127.0.0.1:8091/index.html` 打开页面（同源自动使用 `/api`），或从别处打开后在「设置 → 语音引擎」填后端地址 `http://127.0.0.1:8091`，点「测试连接」验证。
-- 模型 `Xenova/whisper-tiny.en`（约 40MB）首次调用时自动下载到 `server/.cache/`；国内网络先设环境变量再启动：
-  - Windows PowerShell：`$env:HF_ENDPOINT='https://hf-mirror.com'; npm start`
-  - 换更大模型（更准但更慢）：`$env:SPEAKLAB_MODEL='Xenova/whisper-base.en'; npm start`
-- 引擎不可用（后端未启动等）时，跟读自动回退浏览器内置识别并提示。
+- Open `http://127.0.0.1:8091/index.html` (same origin auto-uses `/api`), or open elsewhere and set the backend URL in Settings → Speech Engine, then press "Test connection".
+- The model `Xenova/whisper-tiny.en` (~40MB) auto-downloads into `server/.cache/` on first call. Behind the GFW set the mirror first:
+  - Windows PowerShell: `$env:HF_ENDPOINT='https://hf-mirror.com'; npm start`
+  - Larger model (more accurate, slower): `$env:SPEAKLAB_MODEL='Xenova/whisper-base.en'; npm start`
+- When the backend is unavailable, shadowing automatically falls back to browser recognition with a toast.
 
-### 运行环境
+### Environment
 
-- 桌面：Chrome / Edge 最新版；移动：iOS 15+ Safari / Android Chrome 100+
-- 语音识别由浏览器厂商提供（详见[兼容矩阵](#兼容矩阵与边界处理)）
-- 无任何 CDN / 外链字体，完全离线可用
-
----
-
-## 使用说明
-
-### 跟读台
-
-1. 顶部选择场景（日常/旅行/职场/面试/通用）与**难度**（全部/初级/中级/高级），进入后按序出句；句子卡下方显示该句**成绩记忆**（已练次数/最好/上次，未练过显示"首次挑战"）。
-2. 点「▶ 示范」听原声（逐词高亮），再点红色录音键跟读——实时看到识别文本与电平表。
-3. 松开录音键（或到 20 秒上限自动停止）即出成绩：总分 + 准确度/流利度/完整度 + 逐词色块 + 声波对比台，并给出与记忆成绩的对比（🎉 新纪录 / 较上次 ±N 分）。
-4. **点任意色块听该词标准发音**；红/黄词自动进单词本（首页可见），「重练」回原句（自动切到该句难度）、读绿即移除。
-5. 「↺ 重录」重来，「▶ 回放」听自己的录音，「下一句」继续。所有成绩自动记住，刷新页面、隔天回来都在。
-
-### 对话台
-
-1. 选场景 + 选**对话方式**：「🤖 智能问答」（默认）或「📖 引导式模板」，点「开始对话」。
-2. **智能问答**：助手围绕场景一个问题接一个问题追问（每场景内置 8 题、循环提问）；**无论你怎么回答都会进入下一题**，命中建议答案计入右下角「已答 N · 命中 M」；每题带「中文」翻译与「提示」参考答法。
-3. **引导式模板**：按剧本推进，说错会被引导，连续两次没对上会弹出可点击的建议回答。
-4. 默认开启**跟读复述**：导师每句话旁边有「🎙 跟读」，弹层里跟读打分，气泡标注分数；可在场景选择处关闭。
-5. 填入 LLM Key 后智能问答升级为 **AI 自由追问**：AI 持续提问、纠错卡、提示词与中文翻译。
-6. 「⏹ 结束对话」出小结（模式/轮数/回应成功率）。
-
-### 音标学习卡
-
-1. 顶栏「音标」或首页入口进入：**📚 自由浏览**（按单元音/双元音/辅音筛选）或 **🏆 闯关模式**。
-2. 自由浏览：点卡片看中文发音要领；点例词听 0.55× 慢速示范（目标音素在 IPA 中高亮）；「🎙 跟读」判定通过即标记「已练」。
-3. **闯关模式**：44 个音标按难度递进分 5 阶段，从 /ɪ/ 开始逐关解锁；当前关的例词跟读**通过 3 次**即过关（🎉 解锁下一关），进度条、百分比与路线图实时更新；进度保存在本地，可一键重置。
-4. **跟读只需点一次**：说完停顿约 2 秒自动评分（也可手动点「■ 停止」）。
-5. 判定方式：浏览器引擎按词级比对；**Whisper 引擎按音素词典对比**（如"目标 /θ/ 命中，识别为 /TH IH NG K/"）。
-
-### 每日打卡窗口
-
-1. 每天打开页面（首页）约 1.5 秒后自动弹出打卡卡片：显示连续打卡天数与今日已练句数，点「打卡」即完成。
-2. 打卡后当天不再自动弹出；顶栏 **DAY** 徽标随时可点开查看/关闭。
-3. 连续打卡 7 / 14 / 30 / 50 / 100 天时弹出庆祝提示。
-
-### 统计页
-
-连续天数 / 累计练习 / 近 30 次跟读均分、12 周打卡热力图（颜色深浅 = 当日练习量）、近 30 次成绩趋势曲线；「句子成绩本」列出所有练过句子的最好/上次/次数（最近/最弱排序，可一键重练）；「设置 → 每日目标」设定每天练几句，达标时弹庆祝提示。
-
-### 设置
-
-- **示范语速**：0.6–1.4 倍；**发音偏好**：🇺🇸 美音 / 🇬🇧 英音（示范朗读、点词发音、音标例词全部跟随，本机没有对应 voice 时自动回退）；**界面音效**：可关；**每日目标**：1–30 句。
-- **语音引擎**：浏览器内置 / 本地 Whisper（需启动 server/，可测试连接；不可用时自动回退）。
-- **AI 教练**：选预设（DeepSeek / OpenAI / 通义千问 / 智谱 GLM）或自定义 Base URL + 模型 + Key，「测试连接」可验证。Key 仅存本浏览器 localStorage。
-- **数据**：导出/导入 JSON、清空全部。
+- Desktop: latest Chrome / Edge; mobile: iOS 15+ Safari / Android Chrome 100+
+- ASR is provided by the browser vendor (see [Compatibility](#compatibility--edge-cases))
+- No CDNs, no external fonts — fully usable offline
 
 ---
 
-## 设计系统
+## Usage Guide
 
-### 概念：随身录音棚
+### Shadowing Studio
 
-页面即一间录音棚：吸音棉纹理底、仪表刻度、等宽读数、硬边投影，克制地使用工业感元素；签名元素是**声波对比台**——目标句的几何「节奏谱」与你的真实录音波形上下对照，让"发音差距"直接可见。首页另有**背景漂浮名言**作氛围层——半透明水印式名言在空白背景处缓慢浮动、错峰轮换，鼠标完全穿透。
+1. Pick a scenario (Daily/Travel/Work/Interview/General) and a **level** (All/Beginner/Intermediate/Advanced), sentences play in order; the card shows this sentence's **score memory** (times practiced / best / last, or "first attempt").
+2. Tap ▶ to hear the demo (word-by-word highlight), then press the red record button and read — live transcript and level meter while recording.
+3. Release (or wait for the 20s cap) to get: total + accuracy/fluency/completeness + word chips + waveform compare, plus a comparison against your memory (🎉 new record / ±N vs. last).
+4. **Tap any chip to hear that word**; red/yellow words go to the word book (visible on Home), "re-practice" jumps back (auto-switching level), read green to remove.
+5. ↺ re-record, ▶ replay, Next sentence. Every score is remembered across sessions.
 
-### 配色（8 色令牌）
+### Conversation Studio
 
-| 角色 | 色值 | 用途 |
+1. Pick a scenario + a **mode**: 🤖 Smart Q&A (default) or 📖 Guided Script, then Start.
+2. **Smart Q&A**: the assistant keeps asking one question after another (8 built-in per scenario, cycling); **whatever you answer, the conversation advances**; matching the suggested answer counts into "answered N · hits M" in the footer; each question has a 中文 translation and a hint.
+3. **Guided Script**: progresses line by line; wrong answers get guidance, and two misses reveal clickable suggestions.
+4. **Listen & repeat** is on by default: each tutor line has a 🎙 button; shadow it in the modal and the score appears on the bubble.
+5. With an LLM key, Smart Q&A becomes **AI follow-up questions**: the AI keeps asking, with correction cards, hints and translations.
+6. ⏹ ends the conversation with a summary (mode / turns / hit rate).
+
+### Phoneme Cards
+
+1. Top bar "Phonemes" or the home entry: **📚 Browse** (filter by monophthongs/diphthongs/consonants) or **🏆 Gauntlet**.
+2. Browse: tap a card for the articulation tip; tap example words for 0.55× slow demo (target phoneme highlighted in IPA); 🎙 shadowing marks it "practiced".
+3. **Gauntlet**: 44 phonemes across 5 difficulty stages, starting from /ɪ/; each gate needs **3 passing shadowings** to unlock the next (🎉 celebration); progress bar, percentage and road map update live; progress persists and can be reset.
+4. **One tap is enough**: after speaking, ~2 seconds of silence auto-scores (or tap ■ Stop manually).
+5. Judgment: browser engine = word-level match; **Whisper engine = phoneme dictionary comparison** (e.g. "target /θ/ ✓ hit, recognized as /TH IH NG K/").
+
+### Daily Check-in Window
+
+1. On the home page, a check-in card pops up ~1.5s after load: streak days + today's practice count; tap 打卡 to check in.
+2. It won't auto-pop again that day; the **DAY** badge in the top bar reopens it anytime.
+3. Milestones at 7 / 14 / 30 / 50 / 100 consecutive days trigger celebrations.
+
+### Stats Page
+
+Streak / total practice / last-30 average, a 12-week activity heatmap (darker = more), a last-30 score trend curve; the **sentence score book** lists every practiced sentence's best/last/count (recent/weakest sort, one-tap re-practice); set a **daily goal** in Settings and celebrate when reached.
+
+### Settings
+
+- **Demo speed**: 0.6–1.4×; **Accent**: 🇺🇸 US / 🇬🇧 UK (demo, tap-to-hear and phoneme examples all follow; falls back when no matching voice); **Sound effects**: toggle; **Daily goal**: 1–30 sentences.
+- **Speech engine**: browser built-in / local Whisper (needs `server/`, testable, auto-fallback).
+- **AI coach**: presets (DeepSeek / OpenAI / Qwen / GLM) or custom base URL + model + key; "Test connection" verifies. The key is stored only in your browser's localStorage.
+- **Data**: export/import JSON, clear everything.
+
+---
+
+## Design System
+
+### Concept: a portable recording studio
+
+The page is a recording studio: acoustic-panel texture background, meter tick marks, monospaced readouts, hard-offset shadows — restrained industrial details. The signature element is the **waveform compare stage**: the target sentence's geometric "rhythm spectrum" against your real waveform, making pronunciation gaps visible. The home page adds a **floating quotes** ambience layer: faint watermark-style quotes drift in the empty background, rotating on staggered timers, fully click-through.
+
+### Palette (8 tokens)
+
+| Role | Value | Use |
 |---|---|---|
-| 暖砂岩白 | `#F2EEE4` | 页面底（吸音棉网格纹理） |
-| 墨绿 | `#1F4D3E` | 主色、按钮、导师气泡、节奏谱 |
-| 信号红 | `#E25B3F` | 录音键、强调、错误 |
-| 光谱绿 | `#2FA06B` | 发音得分好 |
-| 琥珀 | `#E2A23B` | 发音得分中 |
-| 红 | `#D9554E` | 发音得分差 |
-| 深墨 | `#22302B` | 正文 |
-| 青灰 | `#5E7A70` | 辅助文字 |
+| Warm sandstone | `#F2EEE4` | Page background (acoustic-panel grid texture) |
+| Ink green | `#1F4D3E` | Primary, buttons, tutor bubbles, rhythm spectrum |
+| Signal red | `#E25B3F` | Record button, emphasis, errors |
+| Spectrum green | `#2FA06B` | Good pronunciation |
+| Amber | `#E2A23B` | Fair pronunciation |
+| Red | `#D9554E` | Bad pronunciation |
+| Deep ink | `#22302B` | Body text |
+| Sage gray | `#5E7A70` | Secondary text |
 
-### 字体
+### Typography
 
-零外链字体（离线可用）：中文用系统黑体栈（PingFang SC / MiSans / Microsoft YaHei），拉丁标题用窄体栈（Arial Narrow / Impact 回退）做大写字母间距的工业标签，数字与仪表读数用等宽字体（ui-monospace / Consolas）。
+Zero external fonts (offline-safe): Chinese uses the system sans stack (PingFang SC / MiSans / Microsoft YaHei); Latin display text uses a condensed stack (Arial Narrow / Impact fallback) with uppercase letter-spacing for industrial labels; numbers and meter readouts use monospace (ui-monospace / Consolas).
 
-### 动效
+### Motion
 
-录音电平跳动、评分数字滚动、逐词色块依次点亮、对话气泡入场、背景名言漂浮；`prefers-reduced-motion` 下全部关闭（名言静止且不轮换）。
+Recording level meter, score count-up, word chips lighting up in sequence, chat bubble entrance, floating quotes drift; everything disabled under `prefers-reduced-motion`.
 
 ---
 
-## 技术架构
+## Technical Architecture
 
 ```
 speaklab/
-├── index.html（单文件，约 5000 行，按注释区块分段）
-│   ├── <style>  设计令牌 + 全部样式（顶栏/首页/跟读台/对话台/音标卡/统计/历史/设置/弹层/打卡卡/背景名言）
-│   └── <script> 25 个区块：
-│       01 工具函数        02 本地存储(localStorage/内存降级)  03 音效合成
-│       04 ASR 封装        05 TTS 封装(逐词高亮/英音美音)     06 录音(电平/静音检测)
-│       07 波形绘制        08 本地评分引擎(严格标准)          09 跟读语料库(90 句·三级难度)
-│       10 对话脚本(6 场景+48 追问) 10b 音标卡数据(44 音标+IPA→ARPA)  11 历史记录
-│       11b 易错词单词本   11c 句子成绩记忆(历史派生) 12 LLM 接入  12b 引擎切换(浏览器/Whisper)
-│       13 跟读模块        14 对话模块(智能问答/模板/AI/跟读复述)  15 路由与顶栏
-│       16 历史/设置视图   16b 统计视图  16c 音标卡视图(含闯关) 16d 每日打卡
-│       16e 背景漂浮名言   17 首页与初始化
-└── server/（可选：本地 Whisper 引擎，Node.js 零框架）
-    ├── server.js         静态托管 + /api/health + /api/transcribe + /api/score
+├── index.html（single file, ~5,000 lines, organized in commented sections）
+│   ├── <style>  design tokens + all styles (top bar / home / shadowing / chat / phonemes / stats / history / settings / modals / check-in card / bg quotes)
+│   └── <script> 25 sections:
+│       01 utils           02 localStorage (memory fallback)   03 sound FX
+│       04 ASR wrapper     05 TTS wrapper (highlight/US/UK)    06 recorder (level/silence)
+│       07 waveform render 08 scoring engine (strict)          09 shadowing corpus (90 sentences, 3 levels)
+│       10 chat scripts (6 scenarios + 48 Q&A)  10b phoneme data (44 phonemes + IPA→ARPA)  11 history
+│       11b mistake word book  11c sentence score memory (derived from history)  12 LLM client  12b engine switch (browser/Whisper)
+│       13 shadowing module  14 chat module (Q&A/script/AI/listen&repeat)  15 router & top bar
+│       16 history/settings views  16b stats view  16c phoneme view (incl. gauntlet)  16d daily check-in
+│       16e floating quotes  17 home & init
+└── server/ (optional: local Whisper engine, zero-framework Node.js)
+    ├── server.js         static hosting + /api/health + /api/transcribe + /api/score
     ├── package.json      @huggingface/transformers + wavefile + cmu-pronouncing-dictionary
-    └── .cache/           模型缓存（首次自动下载，gitignore）
+    └── .cache/           model cache (auto-downloaded on first run, gitignored)
 ```
 
-### 关键实现
+### Key implementations
 
-| 模块 | 要点 |
+| Module | Notes |
 |---|---|
-| 语音识别 | `webkitSpeechRecognition` 双前缀；`continuous + interimResults` 实时显示；`no-speech/aborted` 自动重启（上限 12 次）；**停止后仍累计最终结果但不再回调 UI**（防止残留文字写回输入框） |
-| 语音合成 | 英文 voices 按口音偏好排序（美/英各自优选清单）；逐词高亮按「0.24 + 0.075×词长 / 语速」时间片估算；点词发音 0.55× 慢速 |
-| 录音 | `MediaRecorder`（webm/mp4 探测）+ `AnalyserNode` RMS 实时电平与静音累计；20 秒上限；`decodeAudioData` 取 PCM 画波形；音标跟读用**静音 1.8 秒自动停止** |
-| 评分引擎 | 词级 Needleman–Wunsch 对齐（近似替代代价 1.05−sim 恒大于 0，**精确匹配严格优先**）+ 轻量音形相似（辅音骨架 + 首元音保留）+ 置信度/语速/静音加权（详见下节） |
-| 智能问答 | 每场景 8 题循环题库 + 随机确认语；任何回答都推进；命中建议答案计入命中率；LLM 模式下系统提示词为「追问式面试官」 |
-| 易错词单词本 | 红/黄词按小写形式 upsert（同词累计）；读绿即移除；上限 120 条；首页渲染最近 20 条 |
-| 句子成绩记忆 | 从练习历史实时派生（与导出/导入/清空天然一致）；句子卡 chips + 新纪录对比 + 成绩本排序 |
-| 音标闯关 | 5 阶段 44 关路线图；过关次数持久化；跟读通过 3 次解锁下一关；停顿自动评分 |
-| 统计页 | 12 周 × 7 天热力图（CSS grid，四档色阶）+ Canvas 成绩折线（平均线 + 端点得分色）+ 每日目标进度 |
-| LLM 对话 | OpenAI 兼容接口浏览器直连（非流式 + 超时）；要求模型固定输出「回复 + JSON(hint/translation/correction)」；解析失败/网络错误优雅提示 |
-| Whisper 后端 | transformers.js + onnxruntime-node（CPU, int8）；`Xenova/whisper-tiny.en` 词级时间戳；wavefile 解码；CMUdict（13 万词）音素对比；`HF_ENDPOINT` 镜像支持；词时间戳不可用时自动降级整句转写 |
-| 引擎切换 | `voiceScore()` 统一入口：Whisper 优先 → 失败 toast 并回退浏览器识别 → 仍无结果走文本模式；设置页可测试后端连接 |
-| 数据 | `speaklab.*` 命名空间，练习记录上限 1000；隐私模式降级内存存储 |
+| ASR | `webkitSpeechRecognition` with dual prefixes; `continuous + interimResults` live transcript; auto-restart on `no-speech/aborted` (max 12); **after stop, final results are still accumulated but no longer pushed to the UI** (prevents stale text written back into the input) |
+| TTS | English voices ranked by accent preference (separate US/UK lists); word highlight estimated as `0.24 + 0.075×wordLength / rate` time slices; tap-to-hear at 0.55× |
+| Recorder | `MediaRecorder` (webm/mp4 probing) + `AnalyserNode` RMS level & cumulative silence; 20s cap; `decodeAudioData` → PCM waveform; phoneme practice auto-stops after 1.8s of silence |
+| Scoring | Word-level Needleman–Wunsch alignment (near-match substitution costs 1.05−sim, always > 0, so **exact matches strictly win**) + light phonetic similarity (consonant skeleton + preserved first vowel) + confidence/rate/silence weighting (see below) |
+| Smart Q&A | 8-question bank per scenario cycling + randomized acknowledgments; any answer advances; hit-rate tracking; LLM prompt is an "interviewer that always asks" |
+| Mistake word book | Red/yellow words upserted by lowercase form (count accumulates); removed when read green; cap 120; home renders the latest 20 |
+| Sentence memory | Derived live from practice history (consistent with export/import/clear); chips on the sentence card + new-record comparison + score book sorting |
+| Phoneme gauntlet | 5-stage 44-gate road map; per-gate pass counts persisted; 3 passes unlock the next gate; silence auto-scoring |
+| Stats | 12-week × 7-day heatmap (CSS grid, 4 color tiers) + Canvas score trend (mean line + colored endpoints) + daily goal progress |
+| LLM chat | OpenAI-compatible fetch from the browser (non-streaming, timeout); prompt demands "reply + JSON(hint/translation/correction)"; graceful errors |
+| Whisper backend | transformers.js + onnxruntime-node (CPU, int8); `Xenova/whisper-tiny.en` word timestamps; wavefile decoding; CMUdict (134k words) phoneme comparison; `HF_ENDPOINT` mirror support; degrades to sentence-level transcription when word timestamps are unavailable |
+| Engine switch | `voiceScore()` unified entry: Whisper first → on failure toast + browser fallback → text mode as last resort; backend health testable in Settings |
+| Storage | `speaklab.*` namespace, history capped at 1000 records; memory fallback in privacy mode |
 
 ---
 
-## 本地评分算法
+## Scoring Algorithms
 
-> 浏览器内置引擎的评分是**启发式估算**（免费方案的能力边界），用于学习参考；Whisper 引擎基于真实转写 + 词级时间戳，更接近真实发音。两套引擎均已按**严格标准**调参，界面会标注当前引擎与难度系数。
+> The browser engine's scores are **heuristic estimates** (the honest boundary of a free setup); the Whisper engine scores from real transcription + word timestamps and is closer to true pronunciation. Both engines are tuned to a **strict standard**, and the UI labels the active engine and level coefficient.
 
-### 浏览器内置引擎
+### Browser engine
 
-1. **词对齐**：目标句与识别文本分词后做 Needleman–Wunsch 对齐；词间替代代价由音形相似度决定（辅音骨架 + 首元音保留，相似度 ≥ 0.75 才计近似，如 *coffee↔cofe*；近似替代代价恒大于 0，**精确匹配严格优先**，避免音近词交叉抢位）。
-2. **完整度** = 命中词数 / 目标词数。
-3. **准确度** = 各词得分均值：**完全一致最高 0.9**，音近词按相似度 ×0.8；识别置信度以 **0.5+0.5×conf** 加权（置信度 0.6 的读对只能得黄词）；漏读记 0。绿词线 0.82、黄词线 0.6。
-4. **流利度** = 0.5×语速分（对照 150 词/分，偏离惩罚 ×1.6）+ 0.3×停顿分（停顿惩罚 ×3.2）+ 0.2×犹豫分（每个 um/uh 扣 0.25，下限 0.15）。
-5. **总分** = 0.5×准确度 + 0.3×流利度 + 0.2×完整度；**难度系数**：中级句 ×0.97、高级句 ×0.93。总分配色线 85/70。文本模式下流利度无法测量，改为 0.65×准确度 + 0.35×完整度。
+1. **Word alignment**: Needleman–Wunsch over tokenized words; substitution cost derived from phonetic similarity (consonant skeleton + preserved first vowel; similarity ≥ 0.75 counts as near, e.g. *coffee↔cofe*); near-match cost is always > 0 so **exact matches strictly take priority**.
+2. **Completeness** = matched words / target words.
+3. **Accuracy** = mean word score: **exact match tops at 0.9**, near words score similarity ×0.8; recognition confidence weights **0.5+0.5×conf** (a correct reading at confidence 0.6 only gets yellow); missed words score 0. Green ≥ 0.82, yellow ≥ 0.6.
+4. **Fluency** = 0.5×rate score (vs. 150 wpm, deviation penalty ×1.6) + 0.3×pause score (penalty ×3.2) + 0.2×hesitation score (−0.25 per um/uh, floor 0.15).
+5. **Total** = 0.5×accuracy + 0.3×fluency + 0.2×completeness; **level coefficients**: Intermediate ×0.97, Advanced ×0.93. Total colors at 85/70. In text mode fluency is unavailable → 0.65×accuracy + 0.35×completeness.
 
-### 本地 Whisper 引擎（server/）
+### Local Whisper engine (server/)
 
-1. **转写**：whisper-tiny.en 输出逐词时间戳（真实语速、词间停顿、词时长全部可得）。
-2. **词级音素对比**：目标词与识别词分别查 CMUdict 发音词典（13 万词）→ 逐音素编辑距离 → 词音素得分；词时长与"音素数 × 0.09s + 0.18s"的期望值比对（偏离惩罚 ×1.6），识别出"吞音/过赶"的词。
-3. **词得分** = **0.7×音素得分 + 0.3×时长得分**（词完全一致时）；识别词不同时按音素相似度 ×0.7。词块悬停可见参考音标。绿词线 0.82、黄词线 0.6。
-4. **流利度** = 0.5×语速分（偏离 ×1.6）+ 0.3×停顿分（词间 >0.3s 累计，惩罚 ×3.2）+ 0.2×常数；**总分** = 0.5×准确度 + 0.3×流利度 + 0.2×完整度，**难度系数**中级 ×0.97、高级 ×0.93，并标注真实语速（词/分）。
+1. **Transcription**: whisper-tiny.en with word-level timestamps (true rate, inter-word pauses, word durations).
+2. **Word-level phoneme comparison**: target & recognized words are looked up in CMUdict (134k words) → phoneme edit distance → word phoneme score; word duration is compared to "phoneme count × 0.09s + 0.18s" (deviation penalty ×1.6) to catch rushed/slurred words.
+3. **Word score** = **0.7×phoneme score + 0.3×duration score** (identical words); different words score phoneme similarity ×0.7. Hovering a chip shows reference phonemes. Green ≥ 0.82, yellow ≥ 0.6.
+4. **Fluency** = 0.5×rate (deviation ×1.6) + 0.3×pause (gaps > 0.3s, penalty ×3.2) + 0.2×constant; **total** = 0.5×accuracy + 0.3×fluency + 0.2×completeness with the same **level coefficients**, plus a real speaking-rate label (wpm).
 
 ---
 
-## 兼容矩阵与边界处理
+## Compatibility & Edge Cases
 
-| 能力 | 支持情况 |
+| Capability | Support |
 |---|---|
-| 语音识别 | Chrome（Google 服务，大陆网络可能不稳）/ Edge（微软服务，大陆可用性较好）/ Safari（Siri）；Firefox 不支持 |
-| 录音 | MediaRecorder，现代浏览器全支持 |
-| TTS 示范 | 全部浏览器；无英文 voice 时按钮提示并降级 |
-| 逐词高亮 | 全浏览器（估算时间片，非精确音素时间） |
+| ASR | Chrome (Google service, may be unstable behind the GFW) / Edge (Microsoft service, better in CN) / Safari (Siri); Firefox unsupported |
+| Recording | MediaRecorder — all modern browsers |
+| TTS demo | All browsers; prompts & degrades when no English voice |
+| Word highlight | All browsers (estimated time slices, not exact phoneme timing) |
 
-| 场景 | 行为 |
+| Situation | Behavior |
 |---|---|
-| 浏览器不支持语音识别 / 不识别 | 顶部告警条 + **文本模式**（输入读出的句子同样评分） |
-| 识别网络错误（大陆 Chrome 常见） | 明确提示改用 Edge 或文本模式 |
-| 拒绝麦克风权限 | 引导文案 + 文本模式可用 |
-| 录音没听清 / 太短 | "没听清，再试一次"，不产出成绩 |
-| Whisper 后端未启动 / 模型下载失败 | toast 明确提示 + **自动回退浏览器识别**；仍无结果走文本模式 |
-| LLM Key 缺失 / 超时 / 限流 / CORS 拒绝 | 明确报错文案，可结束对话退回模板模式 |
-| 页面切后台 | 停止录音、复位状态（基于时间戳，不漂移） |
-| localStorage 不可用 | 内存降级，功能可用但不持久 |
-| 识别到多余词 | 虚线框「+word」单独标出 |
+| Browser has no ASR / recognition fails | Top warning banner + **text mode** (type what you read — it still scores) |
+| ASR network error (common with CN Chrome) | Clear guidance to switch to Edge or text mode |
+| Microphone permission denied | Guidance + text mode remains usable |
+| Nothing heard / too short | "Didn't catch that, try again" — no score produced |
+| Whisper backend down / model download failed | Toast + **automatic fallback to browser ASR**; text mode as last resort |
+| LLM key missing / timeout / rate-limited / CORS blocked | Clear error, end conversation and fall back to script mode |
+| Page hidden | Recording stops, state resets (timestamp-based, no drift) |
+| localStorage unavailable | In-memory fallback — usable but not persistent |
+| Extra recognized words | Marked separately as dashed "+word" chips |
 
 ---
 
-## 隐私说明
+## Privacy
 
-- 语音识别音频仅在点击录音时经浏览器厂商服务转写；练习录音**仅本地**用于评分与回放，不自动上传。
-- LLM 请求由你的浏览器直发所选服务商，Key 仅存本浏览器 localStorage，不经过任何第三方服务器。
-- Whisper 引擎的音频只发送到你**本机**的 server/ 后端，不出局域网。
-- 全部练习数据仅存本浏览器，可随时导出/清空。
-
----
-
-## 测试与验证
-
-使用 **playwright-core + 系统 Chrome** 做全量自动化验证（`cd .pwtools && npm i playwright-core && node test.js`，需先起 HTTP 服务）。测试注入假 SpeechRecognition / speechSynthesis 与假麦克风设备，Whisper 与 LLM 用 route 拦截模拟，全程确定性可控，**共 214 项断言**：
-
-- **加载/首页**：标题、今日一句、连续天数、入口卡片、示范朗读与电平动画
-- **评分引擎**：完美跟读（完整度 1、准确度 0.855、总分 ≈90）、完全跑偏（全红 + 多读标注）、跟读一半（6 绿 3 红）、文本模式总分公式、**严格专项**（低置信度读对 → 全黄词、中级 ×0.97 / 高级 ×0.93 难度系数）
-- **跟读闭环**：录音 → 实时识别显示 → 评分 → 逐词色块 → 双波形画布 → 回放/重录/下一句 → 历史写入
-- **文本模式**：无 ASR 降级、告警条、可评分
-- **模板对话**：场景选择、开场白、答错兜底、连续答错出建议按钮、走完全程出小结、历史写入
-- **智能问答**：默认模式选中、连续追问、乱答也推进且无建议按钮、命中率统计、题库循环、提示参考答法、小结与历史
-- **LLM 模式**：拦截模拟成功（回复/翻译/纠错卡/提示词）与失败（明确报错）；系统提示为追问式面试官
-- **点词发音与单词本**：红词自动收录 → 首页列表 → 点词发音 → 重练 → 读绿自动移除 → 空态隐藏
-- **统计页**：概览数字、84 格热力图、趋势图、每日目标进度与达成提醒、设置联动
-- **对话跟读复述**：气泡跟读按钮 → 弹层评分 → 气泡分数标注 → 历史写入 → 开关关闭后按钮消失
-- **对话录音输入清理**：录音中 interim 显示、无结果停止后输入框清空、发送后清空（回归 bug）
-- **Whisper 引擎**：mock 后端拦截（设置切换、测试连接、完整评分链路、语速/音素标注）、后端不可达自动回退浏览器引擎
-- **音标学习卡**：44 张卡片与分类筛选、发音要领、IPA 高亮、例词点读、浏览器词级判定、Whisper 音素判定（/θ/ 命中）、已练标记与进度、历史写入
-- **音标闯关模式**：0/44 初始进度、第一关 /ɪ/、44 格路线图、3 次通过过关解锁、刷新持久化、重置回第一关
-- **跟读停顿自动评分**：只点一次录音 + 停顿 → 自动评分并计入本关计数
-- **每日打卡窗口**：首页自动弹出、打卡状态切换、当天不重复弹出、顶栏唤出、连续 7 天里程碑庆祝
-- **句子成绩记忆**：首次练习"已记住"提示、句子卡记忆 chips、新纪录对比、刷新后持久化、成绩本（计数/条目/重练跳转/最弱优先排序）
-- **英音美音切换**：默认美音、切换英音 voice 优选、utterance.lang 正确、刷新持久化、音标详情口音说明
-- **跟读难度分级**：全部/初级/中级/高级筛选、句卡难度标签、换场景保持、刷新持久化、单词本重练自动切到对应难度
-- **背景漂浮名言**：三个漂浮位渲染、穿透点击、自动错峰轮换、中文翻译、减弱动效下静止
-- **历史/设置**：导出下载、清空、语速滑块、预设填充、保存/清除
-- **移动端/边界**：375px 竖屏全流程零横向溢出、配色令牌像素断言、`prefers-reduced-motion`、`file://` 直开
-- **真实后端冒烟**（手工验证）：`/api/health`、`/api/transcribe`（词级时间戳）、`/api/score`（音素词典 + 全红判定 + 多读标注）——模型经 hf-mirror 镜像下载并实际推理通过
-- **质量门槛**：全程零 console error / pageerror
-
-截图留存于 `_screenshots/*.png`（首页/评分/对话小结/AI 对话/设置/统计/音标/闯关/移动端等）。
+- ASR audio is transcribed by the browser vendor's service only while you're recording; practice recordings are used **locally** for scoring & playback and are never auto-uploaded.
+- LLM requests go directly from your browser to your chosen provider; the key lives only in your browser's localStorage.
+- Whisper engine audio only travels to **your own machine** running `server/`, never leaving your LAN.
+- All practice data stays in your browser and can be exported/cleared anytime.
 
 ---
 
-## 完整开发历程
+## Testing & Verification
 
-项目按「需求 → 设计 → 实现 → 自动化验证 → 修复踩坑」迭代推进，每轮全量回归，从未放松零控制台错误门槛。
+Full automated verification with **playwright-core + system Chrome** (`cd .pwtools && npm i playwright-core && node test.js`, needs the HTTP server running). Tests inject fake SpeechRecognition / speechSynthesis and a fake microphone; Whisper and LLM are mocked via route interception — fully deterministic, **214 assertions**:
 
-| 版本 | 需求 | 实现 | 验证 | 踩坑与修复 |
+- **Load/home**: title, daily sentence, streak, entry cards, demo playback & meter animation
+- **Scoring engine**: perfect reading (completeness 1, accuracy 0.855, total ≈90), complete miss (all red + extras), half reading (6 green 3 red), text-mode total formula, **strictness specifics** (low-confidence correct reading → all yellow, Intermediate ×0.97 / Advanced ×0.93 coefficients)
+- **Shadowing loop**: record → live transcript → score → word chips → dual waveform canvas → replay/re-record/next → history written
+- **Text mode**: no-ASR degradation, banner, scoring works
+- **Guided script chat**: scenario pick, opener, wrong-answer fallback, suggestion buttons after two misses, full walkthrough to summary, history
+- **Smart Q&A**: default mode, endless follow-ups, nonsense answers still advance with no suggestion buttons, hit-rate stats, bank cycling, hint, summary & history
+- **LLM mode**: intercepted success (reply/translation/correction card/hint) and failure (clear error); interviewer-style system prompt
+- **Tap-to-hear & word book**: red-word collection → home list → tap-to-hear → re-practice → auto-removal when green → empty state
+- **Stats page**: overview numbers, 84-cell heatmap, trend chart, daily goal progress & celebration, settings linkage
+- **Listen & repeat**: bubble button → modal scoring → score chip → history → button disappears when toggled off
+- **Chat recording input cleanup**: interim shown while recording, input cleared when stopping without a result, cleared after sending (regression test)
+- **Whisper engine**: mocked backend (engine switch, connection test, full scoring pipeline, wpm/phoneme labels), unreachable backend falls back to browser engine
+- **Phoneme cards**: 44 cards & filters, articulation tips, IPA highlight, example playback, browser word-level and Whisper phoneme-level (/θ/ hit) judgments, practiced marks & progress, history
+- **Phoneme gauntlet**: 0/44 start, first gate /ɪ/, 44-dot road map, 3 passes unlock, persistence across reload, reset back to the first gate
+- **Silence auto-scoring**: single tap + pause → auto-score counted into the gate
+- **Daily check-in window**: auto-popup, state toggle, no repeat same day, DAY badge reopen, 7-day milestone celebration
+- **Sentence score memory**: "remembered" first-time note, memory chips, new-record comparison, persistence after reload, score book (count/items/re-practice jump/weakest-first sort)
+- **US/UK accents**: default US, switching picks UK voice, correct utterance.lang, persisted, accent note in phoneme detail
+- **Shadowing levels**: All/Beginner/Intermediate/Advanced filters, level badge, kept across scene switches & reloads, word-book re-practice auto-switches level
+- **Floating quotes**: three slots rendered, click-through, staggered auto-rotation, Chinese translations, static under reduced motion
+- **History/settings**: export download, clear, TTS rate slider, LLM presets, save/clear
+- **Mobile/edge**: 375px vertical full-flow with zero horizontal overflow, color-token pixel assertions, `prefers-reduced-motion`, `file://` direct open
+- **Real backend smoke** (manual): `/api/health`, `/api/transcribe` (word timestamps), `/api/score` (phoneme dictionary + all-red judgment + extra marking) — model downloaded via hf-mirror and inferred successfully
+- **Quality gate**: zero console errors / page errors throughout
+
+Screenshots are kept in `_screenshots/*.png` (home/scoring/chat summary/AI chat/settings/stats/phonemes/gauntlet/mobile etc.).
+
+---
+
+## Development History
+
+The project iterated in "requirements → design → implementation → automated verification → bug fixing" rounds, with a full regression every round and a zero-console-error gate throughout.
+
+| Version | Requirement | Implementation | Verified | Pitfalls fixed |
 |---|---|---|---|---|
-| **v1.0** 初始发布 | 口语练习网页：跟读打分 + 场景对话，对标流利说/ELSA/Speak | 「录音棚」设计系统、逐句跟读 + 三维评分 + 逐词色块 + 声波对比台、模板对话 + LLM 双模式、60 句语料 + 6 个剧本 | 83 项 | ① 弹窗漏包 `.modal` 容器（真实 UI bug，测试抓住）② 评分对齐把无关词硬凑成命中（收紧相似阈值 + 事后过滤）③ Chrome `utterance.voice` 对异常对象抛 TypeError ④ favicon 404 产生控制台错误 |
-| **v1.1** 功能优化轮 | 点词发音 + 单词本、统计页、对话跟读复述、本地 Whisper 音素级评分 | 单词本自动收录/移除、热力图 + 趋势 + 每日目标、弹层跟读复述、`server/` 后端（transformers.js + CMUdict）、引擎切换 | 120 项 | ① `onnx-community` 模型导出无 cross-attention，无法出词时间戳 → 换 `Xenova/whisper-tiny.en` ② wavefile v11 属性名变化（`wav.fs`→`wav.fmt`）③ cmudict 包为具名导出 ④ 沙箱 EPERM/网络限制 → 升级权限 + hf-mirror 镜像 |
-| **v1.2** 音标卡 + 打卡 | 44 音标学习卡；每日打卡窗口 | 音标卡数据（含 IPA→ARPABET 映射）、分类浏览 + 跟读判定、打卡卡片 + 里程碑（7/14/30/50/100） | 143 项 | ① practice 状态机 `busy` 在录音期间为真，第二次点击被"正在练习中"拦截 → 重构 busy 语义 |
-| **v1.3** 句子成绩记忆 | 每句记住成绩，练完对比进步 | 历史派生的句子记忆（best/last/count）、句子卡 chips、新纪录/较上次反馈、统计页成绩本 | 155 项 | ① README 语料数字笔误（72 句/6 场景 → 实际 60 句/5 场景） |
-| **v1.4** 英音美音切换 | 示范朗读口音偏好 | TTS voice 按美/英优选清单排序、utterance.lang 同步、持久化 | 162 项 | — |
-| **v1.5** 录音输入清理 | 对话录音后输入框残留识别文字 | ASR 停止后不再回调 UI + stopMic 无条件清空输入框 | 166 项 | ① 麦克风按钮自身 pulse 动画导致 Playwright 判定"元素不稳定" → 动画挪到 `::after` 光环 |
-| **v1.6** 智能问答模式 | 不断提问的智能助手，答非所问也继续 | 每场景 8 题追问题库（48 题）+ 随机确认语 + 命中率统计 + 循环；LLM 提示词改「追问式面试官」 | 178 项 | — |
-| **v1.7** 跟读难度分级 | 跟读按难度区分 | 新增 30 句高级语料（三级共 90 句）、难度筛选栏、句卡难度标签、单词本/成绩本重练自动切难度 | 187 项 | ① 成绩本计数期望仍按旧语料数（60→90） |
-| **v1.8** 背景漂浮名言 | 名言漂浮在空旷背景中 | 3 个水印式漂浮位、缓慢浮动 + 错峰轮换、穿透点击、移动端收敛、中文翻译小字 | 194 项 | ① 名言条初版"悬停暂停"与测试鼠标残留冲突 → 改为背景层完全穿透 |
-| **v1.9** 音标闯关 + 停顿评分 | 音标闯关（3 次过关解锁）；录音只点一次 | 5 阶段 44 关路线图、过关持久化 + 重置、静音 1.8 秒自动评分 | 210 项 | ① 闯关模式 practice 结尾整体重渲染会抹掉刚显示的反馈 → 改为回调驱动刷新 |
-| **v2.0** 严格评分体系 | 评分不够严格 | 词分上限 0.9、置信度权重 0.5+0.5×conf、流利度惩罚全面上调、绿黄线 0.82/0.6、总分色线 85/70、中级 ×0.97 / 高级 ×0.93 | 214 项 | ① phoneKey 把首元音全折叠成 'A' → `a`/`i` 相似度 1 交叉配对（保留首元音字母）② `to`/`white` 辅音骨架同为 'T' → 近似替代代价改为 1.05−sim，精确匹配严格优先 |
+| **v1.0** initial release | Speaking practice web app: shadowing scoring + scenario chat, benchmarked against Liulishuo/ELSA/Speak | "Recording studio" design system, sentence shadowing + 3-dimension scoring + word chips + waveform compare, script + LLM dual chat modes, 60-sentence corpus + 6 scripts | 83 | ① modal missing its `.modal` wrapper (a real UI bug caught by tests) ② alignment forced unrelated words into "hits" (tightened similarity threshold + post-filter) ③ Chrome `utterance.voice` setter throws on foreign objects ④ favicon 404 caused console errors |
+| **v1.1** feature round | Tap-to-hear + word book, stats page, listen & repeat in chat, local Whisper phoneme-level scoring | Word book auto-collect/remove, heatmap + trends + daily goal, modal listen & repeat, `server/` backend (transformers.js + CMUdict), engine switching | 120 | ① `onnx-community` export lacks cross-attention → no word timestamps → switched to `Xenova/whisper-tiny.en` ② wavefile v11 renamed properties (`wav.fs`→`wav.fmt`) ③ cmudict package uses named export ④ sandbox EPERM/network limits → escalated permissions + hf-mirror |
+| **v1.2** phoneme cards + check-in | 44 phoneme cards; daily check-in window | Phoneme data (incl. IPA→ARPABET map), category browse + shadowing check, check-in card + milestones (7/14/30/50/100) | 143 | ① practice state machine had `busy=true` while recording, blocking the second click → reworked busy semantics |
+| **v1.3** sentence score memory | Remember every sentence's score and compare progress | History-derived sentence memory (best/last/count), card chips, new-record/delta feedback, stats score book | 155 | ① README corpus count typo (72 sentences/6 scenes → actually 60/5) |
+| **v1.4** US/UK accents | Accent preference for demos | TTS voices ranked by US/UK preference lists, utterance.lang synced, persisted | 162 | — |
+| **v1.5** recording input cleanup | Chat input kept leftover recognition text after recording | ASR stops pushing results to UI after stop + stopMic unconditionally clears the input | 166 | ① mic button's own pulse animation made Playwright judge it "unstable" → animation moved to a `::after` ring |
+| **v1.6** smart Q&A mode | An assistant that keeps asking questions; off-topic answers still advance | 8-question bank per scenario (48 total) + random acknowledgments + hit-rate stats + cycling; LLM prompt becomes an "interviewer that always asks" | 178 | — |
+| **v1.7** shadowing levels | Difficulty tiers for shadowing | 30 new advanced sentences (90 total across 3 levels), level filter bar, level badges, word-book/score-book re-practice auto-switches level | 187 | ① score-book assertions still expected the old corpus size (60→90) |
+| **v1.8** floating background quotes | Quotes floating in the empty background | 3 watermark-style floating slots, slow drift + staggered rotation, click-through, mobile collapse, small Chinese translations | 194 | ① the first bar design's hover-pause conflicted with test mouse position → replaced by a fully click-through background layer |
+| **v1.9** phoneme gauntlet + silence scoring | Gauntlet (3 passes to unlock); record with a single tap | 5-stage 44-gate road map, per-gate persistence + reset, 1.8s silence auto-scoring | 210 | ① practice's final full re-render wiped the just-shown feedback in gauntlet mode → callback-driven refresh |
+| **v2.0** strict scoring system | Scoring was too lenient | Word score cap 0.9, confidence weight 0.5+0.5×conf, tighter fluency penalties, green/yellow lines 0.82/0.6, total colors 85/70, level coefficients ×0.97/×0.93 | 214 | ① phoneKey collapsed all first vowels to 'A' → `a`/`i` got similarity 1 and cross-paired (now preserves the vowel letter) ② `to`/`white` share the same consonant skeleton 'T' → near-substitution cost changed to 1.05−sim so exact matches strictly win |
 
 ---
 
-## 内容库规模
+## Content Library
 
-| 内容 | 规模 | 说明 |
+| Content | Size | Notes |
 |---|---|---|
-| 跟读语料 | **90 句** | 5 场景（日常/旅行/职场/面试/通用）× 3 难度 × 6 句，每句带中文释义与发音提示 |
-| 对话剧本 | **6 场景 × 4~5 轮** | 模板模式剧本，含建议回复集、提示、翻译、兜底引导 |
-| 智能问答题库 | **48 题** | 每场景 8 个追问（问题 + 建议答案 + 中文翻译） |
-| 音标卡 | **44 个** | 12 单元音 + 8 双元音 + 24 辅音，每卡要领 + 2 个例词（IPA 高亮） |
-| 音标闯关路线 | **44 关 × 5 阶段** | 单元音 → 双元音 → 辅音易/中/难 |
-| IPA→ARPABET 映射 | **45 条** | Whisper 音素判定用 |
-| 背景名言 | **24 条** | 语言/学习主题（英文 + 作者 + 中文翻译） |
-| 发音词典 | **13 万词** | CMUdict（server 端，音素对比用） |
+| Shadowing corpus | **90 sentences** | 5 scenarios (Daily/Travel/Work/Interview/General) × 3 levels × 6, each with Chinese gloss & pronunciation tip |
+| Chat scripts | **6 scenarios × 4–5 turns** | Guided-script mode: accepted replies, hints, translations, fallbacks |
+| Smart Q&A bank | **48 questions** | 8 per scenario (question + suggested answer + Chinese translation) |
+| Phoneme cards | **44 phonemes** | 12 monophthongs + 8 diphthongs + 24 consonants; each with articulation tip + 2 example words (IPA highlighted) |
+| Gauntlet road | **44 gates × 5 stages** | Monophthongs → diphthongs → consonants easy/mid/hard |
+| IPA→ARPABET map | **45 entries** | For Whisper phoneme judgment |
+| Floating quotes | **24 quotes** | Language/learning themed (English + author + Chinese translation) |
+| Pronunciation dictionary | **134k words** | CMUdict (server-side, phoneme comparison) |
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 speaklab/
-├── index.html          # 唯一前端交付文件（样式+脚本内联，含全部语料/音标/名言/题库）
-├── README.md           # 本文档（完整流程与开发历程）
+├── index.html          # the only frontend deliverable (styles+scripts inline, all content included)
+├── README.md           # English documentation (this file)
+├── README.zh-CN.md     # 完整中文文档
 ├── LICENSE             # MIT
-├── .gitignore          # 忽略 .pwtools/ server/node_modules/ server/.cache/ 等
-├── server/             # 可选：本地 Whisper 引擎（Node.js 零框架）
-│   ├── server.js       # 静态托管 + /api/health + /api/transcribe + /api/score
+├── .gitignore          # excludes .pwtools/ server/node_modules/ server/.cache/ etc.
+├── server/             # optional: local Whisper engine (zero-framework Node.js)
+│   ├── server.js       # static hosting + /api/health + /api/transcribe + /api/score
 │   ├── package.json    # @huggingface/transformers + wavefile + cmu-pronouncing-dictionary
-│   └── .cache/         # 模型缓存（首次自动下载，gitignore）
-├── .pwtools/           # 开发期 Playwright 测试（不入库）
-│   └── test.js         # 22 个测试节 · 214 项断言
-└── _screenshots/       # 自动化测试截图
+│   └── .cache/         # model cache (auto-downloaded, gitignored)
+├── .pwtools/           # dev-time Playwright tests (not committed)
+│   └── test.js         # 22 test sections · 214 assertions
+└── _screenshots/       # automated test screenshots
 ```
 
 ---
 
-## 已知限制
+## Known Limitations
 
-1. **浏览器引擎评分为启发式估算**：识别文本 + 置信度 + 语速停顿，无法区分"读得对但识别错"与真实发音错误；追求音素级反馈请使用本地 Whisper 引擎（词级音素对比同样基于词典推断，非逐音素声学模型）。
-2. **Whisper tiny 模型精度有限**：短词、快语速下可能误识别；可换 base/small 模型（更准更慢）。
-3. **逐词高亮为估算**：浏览器 TTS 不提供精确词时间戳，高亮按词长比例估算。
-4. **大陆网络**：Chrome 内置识别走 Google 服务可能不稳，建议用 Edge 或 Whisper 引擎。
-5. **单机单浏览器存储**：数据存 localStorage，无账号体系；换浏览器/清缓存会丢失（可导出 JSON 备份）。
-6. **LLM 直连依赖服务商 CORS**：个别服务商禁止浏览器直连，需换支持的服务或使用模板模式。
+1. **Browser-engine scores are heuristic estimates**: recognition text + confidence + rate/pauses can't tell "read correctly but misrecognized" apart from true errors; for phoneme-level feedback use the local Whisper engine (its word-level phoneme comparison is likewise dictionary-inferred, not a per-phoneme acoustic model).
+2. **Whisper tiny model is small**: short words and fast speech may be misrecognized; switch to base/small for better accuracy at the cost of speed.
+3. **Word highlighting is estimated**: browser TTS provides no precise word timestamps.
+4. **CN networks**: Chrome's built-in ASR relies on Google services and may be unstable; prefer Edge or the Whisper engine.
+5. **Single-browser storage**: data lives in localStorage with no account system; clearing the browser loses data (export JSON first).
+6. **LLM direct calls depend on provider CORS**: some providers block browser direct calls; switch providers or use script mode.
 
 ---
 
-## 后续可扩展方向
+## Roadmap
 
-- [ ] 自由演讲分析（Speech Analyzer 式：自由说 30~60 秒 → 语速/停顿/填充词 + LLM 语法点评）
-- [ ] 首页「今日任务」计划卡（弱项跟读 + 对话 + 音标卡自动排期）
-- [ ] 对话表现报告（LLM 对话结束出语法错误清单 + 地道表达）
-- [ ] 最小对立对辨音卡（ship/sheep、bit/beat）
-- [ ] 音标卡按易错音素联动推荐（跟读红词 → 对应音标卡复习）
-- [ ] 间隔重复复习队列（句子成绩记忆 + SM-2 类算法）
-- [ ] XP 等级 + 成就徽章墙
-- [ ] LLM 回复流式输出（打字机效果）
-- [ ] Whisper 更大模型 + 音素级强制对齐（wav2vec2）
-- [ ] PWA 化（离线缓存 + 添加到主屏幕）
+- [ ] Free-speech analysis (Speech-Analyzer style: speak 30–60s freely → rate/pauses/fillers + LLM grammar review)
+- [ ] Home "today's tasks" planner (auto-schedules weak shadowing + a chat + phoneme cards)
+- [ ] Conversation performance report (grammar error list + idiomatic expressions after LLM chats)
+- [ ] Minimal-pair discrimination cards (ship/sheep, bit/beat)
+- [ ] Phoneme card recommendations driven by weak phonemes (red words → matching phoneme cards)
+- [ ] Spaced-repetition review queue (sentence score memory + SM-2-style scheduling)
+- [ ] XP levels + achievement badge wall
+- [ ] LLM streaming replies (typewriter effect)
+- [ ] Bigger Whisper models + true phoneme-level forced alignment (wav2vec2)
+- [ ] PWA (offline cache + add to home screen)
 
 ---
 
 ## License
 
-MIT License © 2026 — 自由使用、修改与分享。语料、对话脚本、音标卡与名言内容均为原创编写。
+MIT License © 2026 — free to use, modify and share. All corpus, chat scripts, phoneme cards and quotes are original content.
