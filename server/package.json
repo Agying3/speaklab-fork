@@ -1,0 +1,15 @@
+{
+  "name": "speaklab-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SpeakLab local Whisper engine: ASR + phoneme-aware pronunciation scoring",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.3",
+    "cmu-pronouncing-dictionary": "^3.0.0",
+    "wavefile": "^11.0.0"
+  }
+}
