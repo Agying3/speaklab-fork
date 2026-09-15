@@ -1136,6 +1136,127 @@ const Store = {
 };
 
 /* ============================================================
+   02b · 后端探测（可选，不存在时一切照旧）
+   ------------------------------------------------------------
+   前端本来就能独立跑。这里只是问一句「后面有没有服务」，
+   有就走服务端能力（本地识别、多端同步、密钥托管），
+   没有就退回浏览器那套，功能不减。
+
+   探测只做一次，失败了记下来不再重试，避免每次操作都
+   卡在一个连不上的地址上。
+   ============================================================ */
+const Backend = {
+  base:      '',           // 例如 http://127.0.0.1:8787 ，空表示没探测到
+  ready:     false,        // 探测完成且服务可用
+  probed:    false,        // 是否探测过（成功失败都算）
+  caps:      {},           // {asr_local, llm_proxy, auth_required}
+  token:     '',
+  TIMEOUT:   800,          // 单个候选地址的超时
+
+  /* 候选地址，按优先级排。
+     只有 http(s) 同源是可以安全自动探测的——同源请求打不通
+     也只会得到 404，不会在控制台留下连接错误。
+     本机回环地址只在用户显式开启后才试。 */
+  candidates(){
+    const list = [];
+    if(location.protocol.startsWith('http')) list.push(location.origin);
+    list.push('http://127.0.0.1:8787');
+    return [...new Set(list)];
+  },
+
+  /* 探测单个地址。打不通就返回 false，不抛异常。 */
+  async tryOne(base){
+    try{
+      const ctl = new AbortController();
+      const t = setTimeout(()=>ctl.abort(), this.TIMEOUT);
+      const r = await fetch(base + '/api/v1/meta', { signal: ctl.signal });
+      clearTimeout(t);
+      if(!r.ok) return false;
+      const m = await r.json();
+      if(m && m.name === 'speaklab-server'){
+        this.base = base;
+        this.caps = m.capabilities || {};
+        return true;
+      }
+    }catch(e){ /* 连不上是常态，不是错误 */ }
+    return false;
+  },
+
+  /* 启动时调一次。
+     注意：连接被拒时浏览器会在控制台记一行 ERR_CONNECTION_REFUSED，
+     这是网络层的行为，脚本屏蔽不掉。所以只在两种情况下探测：
+     同源（打不通也只是 404，没有红字），或用户显式开过后端开关。
+     别让每个人打开页面都看到两行连接错误。 */
+  async probe(){
+    if(this.probed) return this.ready;
+    this.probed = true;
+    this.token = Store.get('backendToken','');
+
+    const bases = [];
+    // 同源托管是最常见也最安全的假设，自动试
+    if(location.protocol.startsWith('http')) bases.push(location.origin);
+    // 用户主动连过之后才试回环地址
+    if(Store.get('backendEnabled', false)) bases.push('http://127.0.0.1:8787');
+
+    if(!bases.length){ this.base=''; this.caps={}; return false; }
+
+    const results = await Promise.all(bases.map(b => this.tryOne(b)));
+
+    // 按候选顺序取第一个成功的，保证优先级生效
+    const hit = results.indexOf(true);
+    if(hit < 0){ this.base = ''; this.caps = {}; return false; }
+    if(hit > 0) await this.tryOne(bases[hit]); // 重新写入 base/caps
+
+    this.ready = !!this.base;
+    return this.ready;
+  },
+
+  /* 让用户手动连一次。设置页的「连接后端」按钮调它。 */
+  async connect(base){
+    if(base) this.base = base.replace(/\/+$/,'');
+    else this.base = '';
+    const ok = this.base ? await this.tryOne(this.base) : false;
+    this.ready = ok;
+    Store.set('backendEnabled', ok);
+    return ok;
+  },
+
+  /* 后端是否提供了某项能力 */
+  has(cap){ return this.ready && !!this.caps[cap]; },
+
+  headers(){
+    const h = { 'Content-Type':'application/json' };
+    if(this.token) h['Authorization'] = 'Bearer ' + this.token;
+    return h;
+  },
+
+  /* 统一的请求封装：超时、错误归一化。
+     返回 {ok, data} 而不是抛异常，调用方用 if 判断即可。 */
+  async req(path, opt={}){
+    if(!this.ready) return { ok:false, reason:'offline' };
+    try{
+      const ctl = new AbortController();
+      const t = setTimeout(()=>ctl.abort(), opt.timeout || 15000);
+      const r = await fetch(this.base + path, {
+        ...opt, signal: ctl.signal,
+        headers: { ...this.headers(), ...(opt.headers||{}) },
+      });
+      clearTimeout(t);
+      const data = await r.json().catch(()=>null);
+      if(!r.ok){
+        return { ok:false, status:r.status,
+                 code: data && data.error ? data.error.code : 'http_'+r.status,
+                 message: data && data.error ? data.error.message : r.statusText };
+      }
+      return { ok:true, data };
+    }catch(e){
+      return { ok:false, reason: e.name === 'AbortError' ? 'timeout' : 'network',
+               message: e.message };
+    }
+  },
+};
+
+/* ============================================================
    03 · 音效（WebAudio 实时合成，零音频文件）
    ============================================================ */
 const FX = {
@@ -3848,6 +3969,12 @@ function initNav(){
 
 <!-- [dino] injected -->
 init();
+
+/* 后端探测放在 init() 之后：它是纯异步的，不阻塞首屏。
+   探测到就记下来，各模块按需取用；没探测到就什么都不发生。 */
+Backend.probe().then(ok => {
+  if(ok) console.info('[backend] 已连接 ' + Backend.base, Backend.caps);
+});
 </script>
 <!-- T-Rex runner assets. BSD-3-Clause, from wayou/t-rex-runner (see dino/LICENSE). -->
 <div id="offline-resources" class="hidden" aria-hidden="true">

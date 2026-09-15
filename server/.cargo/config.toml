@@ -1,0 +1,8 @@
+﻿# 链接选项。
+#
+# 说明：whisper-rs-sys 的构建脚本会发出 rustc-link-lib=dylib=stdc++，
+# 把 libstdc++ 变成动态依赖，这一条压不过（rustflags 在依赖之前生效）。
+# 所以产物需要挨着几个 MinGW 的 DLL 才能跑，见 scripts/copy-dlls.ps1。
+# 这里只保留 crt-static，让 C 运行库静态化，减少一个依赖。
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "target-feature=+crt-static"]
