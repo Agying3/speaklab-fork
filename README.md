@@ -83,7 +83,8 @@ Four training modules + one learning loop:
 | 🔤 **Phoneme cards** | 44 IPA phonemes: category browsing, Chinese articulation tips, IPA-highlighted example words with slow playback, shadowing check (word-level judgment), progress |
 | 🏆 **Phoneme gauntlet** | 44 gates across 5 difficulty stages; **3 passes unlock the next gate**; progress bar + percentage + road map (passed ✓/current/locked), persisted & resettable |
 | 📈 **Stats page** | Streak / total practice / last-30 average + 12-week heatmap + score trend curve + daily goal progress & celebration + sentence score book |
-| 📉 **Voice ticker** | Your live pitch drawn as a candlestick chart: red = rising, green = falling, scrolling right-to-left with off-screen history trimmed. Independent capture chain; **no backend required** |
+| 📉 **Voice ticker** | A thin always-on bar at the bottom of every page: your live pitch drawn as red/green candlesticks, scrolling right-to-left with off-screen history trimmed. Transparent and background-free so it stays out of the way; independent capture chain, **no backend required** |
+| 🦖 **Break-time dino** | The Chromium offline T-Rex, opened as a modal from a home card. Runs only while the modal is open and tears itself down on close, so it never touches your practice session. BSD-3-Clause, see `dino/` |
 | 📅 **Daily check-in window** | Auto-pops on the home page; DAY badge reopens it anytime; milestone celebrations at 7/14/30/50/100 days |
 | 💬 **Floating background quotes** | 2–3 watermark-style quotes float in empty background space (italic English + author + small Chinese translation), slow drift, staggered rotation; click-through; collapses to one on mobile; static under `prefers-reduced-motion` |
 | 🧠 **Sentence score memory** | Every sentence remembers best/last/count (persisted in localStorage); instant comparison after scoring (new record 🎉 / delta vs. last); "sentence score book" in stats (recent/weakest sort) + one-tap re-practice |
@@ -360,8 +361,13 @@ speaklab/
 ├── LICENSE             # MIT
 ├── .gitignore          # excludes .pwtools/ (dev-time test scripts) etc.
 ├── docs/               # technical assessment, audit reports and a change plan
+├── dino/               # BSD-3 notices for the inlined T-Rex Runner (see dino/README.md)
 └── _screenshots/       # screenshots
 ```
+
+> `index.html` inlines the T-Rex Runner as well. Upstream code is BSD-3-Clause,
+> so `dino/LICENSE` must stay in the tree — see [dino/README.md](dino/README.md)
+> for what was changed and why.
 
 ---
 
