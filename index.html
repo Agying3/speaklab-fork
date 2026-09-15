@@ -108,7 +108,7 @@ a{color:var(--green-2)}
 .view{display:none}
 .view.active{display:block;animation:viewIn .28s var(--ease)}
 @keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-main{max-width:960px;margin:0 auto;padding:18px 20px 90px}
+main{max-width:960px;margin:0 auto;padding:18px 20px var(--tk-safe,90px)}
 
 .section-title{
   font-family:var(--font-disp);font-weight:700;letter-spacing:.14em;
@@ -614,33 +614,67 @@ input[type=range]{accent-color:var(--green);width:180px}
 }
 main{position:relative;z-index:1}
 
-/* ---------- 14 · 声纹行情（实时音高 K 线） ---------- */
-.ticker-wrap{display:flex;flex-direction:column;gap:14px}
-.ticker-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.ticker-quote{display:flex;align-items:baseline;gap:10px}
-.ticker-price{font-size:38px;font-weight:800;letter-spacing:-.02em;color:var(--green);font-variant-numeric:tabular-nums;line-height:1}
-.ticker-unit{font-size:13px;color:var(--ink3);font-weight:600}
-.ticker-delta{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
-.ticker-delta.up{color:#B23A2E}
-.ticker-delta.down{color:#1F7A4D}
-.ticker-delta.flat{color:var(--ink3)}
-.ticker-meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
-.ticker-meta b{color:var(--ink2);font-weight:600}
+/* ---------- 14 · 海绵体膨胀率（贴底细条 · 无背景） ---------- */
+#tkBar{
+  position:fixed;left:0;right:0;bottom:0;z-index:70;
+  background:none;border:0;box-shadow:none;
+  padding:0 0 4px;
+  display:flex;align-items:flex-end;gap:10px;
+  user-select:none;pointer-events:none;
+}
+/* 默认低调但看得清；鼠标靠近时完全显现 */
+#tkBar .tk-label,
+#tkBar .tk-ctl{ pointer-events:auto; opacity:.62; transition:opacity .25s ease; }
+#tkBar:hover .tk-label,
+#tkBar:hover .tk-ctl{ opacity:1; }
 
-.canvas-box{position:relative;background:#0E1A16;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-#tkCanvas{display:block;width:100%;height:320px}
-.canvas-note{position:absolute;left:12px;bottom:8px;font-size:11px;color:rgba(255,255,255,.32);letter-spacing:.04em}
-.canvas-badge{position:absolute;right:10px;top:10px;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.55)}
-.canvas-badge.live{background:rgba(178,58,46,.22);color:#F08A7E}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
-.canvas-badge.live{animation:blink 1.1s ease-in-out infinite}
+#tkBar .tk-label{
+  flex:0 0 auto;display:flex;align-items:baseline;gap:6px;white-space:nowrap;
+  padding:0 0 3px 12px;
+}
+#tkBar .tk-name{
+  font-size:9.5px;font-weight:700;letter-spacing:.14em;
+  color:var(--ink3);text-transform:uppercase;
+}
+#tkBar .tk-val{
+  font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--ink2);letter-spacing:.01em;
+}
+#tkBar .tk-val.hot{color:#C2453A}
+#tkBar .tk-unit{display:none}
 
-.ticker-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.ticker-axis{display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);padding:0 2px;font-variant-numeric:tabular-nums}
+#tkCanvas{flex:1 1 auto;display:block;height:88px;min-width:120px}
 
-@media (max-width:640px){
-  #tkCanvas{height:230px}
-  .ticker-price{font-size:30px}
+#tkBar .tk-ctl{ flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:0 12px 3px 0; }
+#tkBar .tk-btn{
+  font:inherit;font-size:10.5px;font-weight:700;letter-spacing:.06em;
+  padding:3px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--ink3);background:transparent;color:var(--ink2);
+  transition:color .16s ease,border-color .16s ease,background .16s ease;
+  white-space:nowrap;
+}
+#tkBar .tk-btn:hover{color:#fff;background:var(--green);border-color:var(--green)}
+#tkBar .tk-btn.on{color:#fff;background:#C2453A;border-color:#C2453A}
+#tkBar .tk-btn.on:hover{background:#A93A30;border-color:#A93A30}
+#tkBar .tk-dot{
+  width:5px;height:5px;border-radius:50%;background:var(--ink3);
+  flex:0 0 auto;transition:background .2s ease;
+}
+#tkBar .tk-dot.live{background:#C2453A;animation:tkPulse 1.3s ease-in-out infinite}
+@keyframes tkPulse{0%,100%{opacity:1}50%{opacity:.28}}
+#tkBar .tk-msg{ display:none; }
+/* 未开工时给一点存在感，避免整条被忽略 */
+#tkBar .tk-label::before{
+  content:'●';font-size:7px;color:var(--ink3);
+  align-self:center;margin-right:2px;
+}
+#tkBar.live .tk-label::before{ color:#C2453A; }
+
+@media (max-width:720px){
+  #tkCanvas{height:64px}
+  #tkBar .tk-name{display:none}
+  #tkBar .tk-label{padding-left:8px}
+  #tkBar .tk-ctl{padding-right:8px}
 }
 
 /* ---------- 响应式与动效偏好 ---------- */
@@ -678,7 +712,6 @@ main{position:relative;z-index:1}
     <nav class="topnav">
       <button data-nav="home">首页</button>
       <button data-nav="phonetics">音标</button>
-      <button data-nav="ticker">行情</button>
       <button data-nav="stats">统计</button>
       <button data-nav="history">历史</button>
       <button data-nav="settings">设置</button>
@@ -726,11 +759,6 @@ main{position:relative;z-index:1}
         <span class="e-desc">44 个国际音标卡：发音要领 + 例词点读 + 跟读判定，发音基础从这里开始。</span>
         <span class="e-go">进入音标卡 →</span>
       </button>
-      <button class="entry" id="goTicker">
-        <span class="e-icon">📈</span>
-        <span class="e-title">声纹行情</span>
-        <span class="e-desc">把声音当成一支股票：实时基频走势图，红涨绿跌，换口气就是一根新 K 线。</span>
-        <span class="e-go">进入行情台 →</span>
       </button>
     </div>
 
@@ -893,48 +921,6 @@ main{position:relative;z-index:1}
     <p class="note" style="margin-top:12px">※ 点卡片看发音要领，点例词听慢速示范；「跟读」判定按词级比对。闯关模式：难度依次递进，每个音标通过 3 次过关并解锁下一关。</p>
   </section>
 
-  <!-- ============ 声纹行情 ============ -->
-  <section id="view-ticker" class="view">
-    <p class="section-title" style="margin-top:0">声纹行情 <span class="tick">// LIVE TICKER</span></p>
-
-    <div class="card ticker-wrap">
-      <div class="ticker-head">
-        <div class="ticker-quote">
-          <span class="ticker-price" id="tkPrice">--</span>
-          <span class="ticker-unit">VOX</span>
-          <span class="ticker-delta flat" id="tkDelta">--</span>
-        </div>
-        <div class="ticker-meta">
-          <span>开盘 <b id="tkOpen">--</b></span>
-          <span>最高 <b id="tkHigh">--</b></span>
-          <span>最低 <b id="tkLow">--</b></span>
-          <span>振幅 <b id="tkAmp">--</b></span>
-          <span>成交量 <b id="tkVol">0</b></span>
-        </div>
-      </div>
-
-      <div class="canvas-box">
-        <canvas id="tkCanvas"></canvas>
-        <span class="canvas-badge" id="tkBadge">休市</span>
-        <span class="canvas-note">实时基频跟踪 · 单位 VOX</span>
-      </div>
-
-      <div class="ticker-axis">
-        <span id="tkAxisLo">--</span>
-        <span>时间 →</span>
-        <span id="tkAxisHi">--</span>
-      </div>
-
-      <div class="ticker-controls">
-        <button class="btn primary" id="tkStart">🔴 开盘（开始采集）</button>
-        <button class="btn" id="tkStop" disabled>⏹ 收盘</button>
-        <button class="btn ghost" id="tkClear">清空行情</button>
-        <span class="note" id="tkStatus" style="margin:0">等待开盘…</span>
-      </div>
-
-      <p class="note">※ K 线按实时基频（音高）绘制，每根蜡烛代表一个采样窗口：<b>红</b>=上涨、<b>绿</b>=下跌。走势从右往左推进，超出左边界的历史会被裁掉。静音时段不产生新 K 线。</p>
-    </div>
-  </section>
 
   <!-- ============ 统计 ============ -->
   <section id="view-stats" class="view">
@@ -1057,6 +1043,21 @@ main{position:relative;z-index:1}
     </div>
   </section>
 </main>
+
+<!-- ============ 海绵体膨胀率 · 全局浮窗（常驻，不可拖动/关闭） ============ -->
+<div id="tkBar" role="status" aria-live="off" aria-label="海绵体膨胀率">
+  <span class="tk-dot" id="tkDot"></span>
+  <span class="tk-label">
+    <span class="tk-name">海绵体膨胀率</span>
+    <span class="tk-val" id="tkVal">--</span>
+    <span class="tk-unit">HZ</span>
+  </span>
+  <canvas id="tkCanvas"></canvas>
+  <span class="tk-ctl">
+    <span class="tk-msg" id="tkMsg">未开工</span>
+    <button class="tk-btn" id="tkToggle">开始</button>
+  </span>
+</div>
 
 <div id="checkinCard" class="checkin-card hidden" role="dialog" aria-label="每日打卡">
   <button class="ci-close" id="ciClose" aria-label="关闭打卡卡片">×</button>
@@ -2815,8 +2816,6 @@ const Router = {
     if(name==='phonetics') PhoneticsView.render();
     if(name==='home') renderMistakes();
     if(name==='chat') ChatApp.refreshModeChip();
-    if(name==='ticker') Ticker.resize();
-    if(name!=='ticker' && Ticker.running) Ticker.stop();
     window.scrollTo(0,0);
   }
 };
@@ -3385,31 +3384,29 @@ const QUOTES = [
 ];
 
 /* ============================================================
-   18 · 声纹行情（实时音高 K 线）
+   18 · 海绵体膨胀率（全局浮窗 · 实时音高走势）
    ------------------------------------------------------------
-   独立采集链路：单独开 getUserMedia + AudioContext，不复用 Recorder，
-   避免与跟读/对话录音互相干扰。用自相关法求基频（pitch），
-   每个采样窗口聚合成一根 K 线，从右向左滚动。
+   常驻底部的浮窗，任何页面都可见。独立采集链路：单独开
+   getUserMedia + AudioContext，不复用 Recorder，避免与跟读/对话
+   录音互相干扰。用 YIN 的 CMNDF 求基频，滑窗聚合成一条滚动走势。
    ============================================================ */
 const Ticker = {
   stream:null, ac:null, node:null, analyser:null, raf:0, running:false,
-  buf:null, candles:[], tok:0,
-  // 采样与聚合参数
-  WIN_MS:110,        // 每根 K 线的采样窗口
-  MIN_HZ:75, MAX_HZ:450,   // 人声基频搜索范围（留出余量，避免上边界插值被卡死）
-  MIN_RMS:0.006,     // 低于此能量视为静音，不出 K 线
-  winStart:0, winPitches:[], winRms:0,
-  maxCandles:0,
+  buf:null, points:[], tok:0,
+  MIN_HZ:75, MAX_HZ:450,   // 人声基频搜索范围（留余量，避免上边界插值被卡死）
+  MIN_RMS:0.006,           // 低于此能量视为静音
+  SAMPLE_MS:35,            // 出新 K 线的间隔（越小越密、滚动越快）
+  SMOOTH:0.72,             // 平滑系数：越大越稳，抑制逐点抖动
+  MIN_SPAN:70,             // 视觉量程下限（Hz），避免轻微起伏被放大成剧烈波动
+  TARGET_BARS:100,         // 屏上同时显示的 K 线根数
+  winStart:0, winPitches:[], winRms:0, smoothHz:0,
+  maxPoints:100,
+  intro:1, _needFrame:false,
 
   supported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); },
 
-  /* 自相关求基频（标准 CMNDF，YIN 论文的简化版）。
-     返回 Hz；置信度不足返回 0（视为无音高）。
-     要点：
-       1) 差值函数 d(lag) = Σ(x[i]-x[i+lag])²  ——不用自相关，天然不受能量偏置影响
-       2) 累积均值归一化 d'(lag) = d(lag) / ((1/lag)·Σd(1..lag))
-       3) 取第一个低于阈值的局部极小作为周期，避免八度误判
-       4) 抛物线插值提高分辨率 */
+  /* 基频检测：YIN 的 CMNDF（差值函数 + 累积均值归一化 + 首个低谷 + 抛物线插值）。
+     返回 Hz；置信度不足返回 0（视为无音高）。 */
   detectPitch(data, sr){
     const n = data.length;
     let rms = 0;
@@ -3431,7 +3428,6 @@ const Ticker = {
       }
       d[lag] = sum;
     }
-
     // 2) 累积均值归一化
     const cmnd = new Float32Array(maxLag+1);
     cmnd[0] = 1;
@@ -3441,30 +3437,24 @@ const Ticker = {
       const cnt = lag - minLag + 1;
       cmnd[lag] = running > 0 ? d[lag] / (running/cnt) : 1;
     }
-
-    // 3) 找第一个低于阈值的局部极小（YIN 原论文用 0.1）
-    //    阈值越松，越容易在高频信号上过早锁定到二倍周期（八度偏低）
+    // 3) 首个足够深的谷（阈值越松越容易锁到二倍周期）
     let tau = -1;
     for(let lag=minLag+1; lag<maxLag; lag++){
       if(cmnd[lag] < 0.10){
         let k = lag;
         while(k+1 <= maxLag && cmnd[k+1] < cmnd[k]) k++;
-        tau = k;
-        break;
+        tau = k; break;
       }
     }
-    // 没有足够深的谷：放宽到 0.25 再试一次
     if(tau < 0){
       for(let lag=minLag+1; lag<maxLag; lag++){
         if(cmnd[lag] < 0.25 && cmnd[lag] <= cmnd[lag-1]){
           let k = lag;
           while(k+1 <= maxLag && cmnd[k+1] < cmnd[k]) k++;
-          tau = k;
-          break;
+          tau = k; break;
         }
       }
     }
-    // 仍然没有：取全局最小，但要求它足够像一个周期
     if(tau < 0){
       let best = Infinity;
       for(let lag=minLag; lag<=maxLag; lag++){
@@ -3472,7 +3462,6 @@ const Ticker = {
       }
       if(tau < 0 || best > 0.55) return {hz:0, rms};
     }
-
     // 4) 抛物线插值
     let refined = tau;
     if(tau > minLag && tau < maxLag){
@@ -3483,11 +3472,9 @@ const Ticker = {
         if(Math.abs(shift) < 1) refined = tau + shift;
       }
     }
-
     const hz = sr/refined;
     if(!isFinite(hz) || hz < this.MIN_HZ || hz > this.MAX_HZ) return {hz:0, rms};
-    const conf = Math.max(0, 1 - cmnd[tau]);
-    return {hz, rms, conf};
+    return {hz, rms, conf: Math.max(0, 1 - cmnd[tau])};
   },
 
   resize(){
@@ -3497,56 +3484,70 @@ const Ticker = {
     const r = cv.getBoundingClientRect();
     cv.width = Math.max(1, Math.round(r.width*dpr));
     cv.height = Math.max(1, Math.round(r.height*dpr));
-    // 可视区能容纳的 K 线数量：留 8px 让最左侧那根"越界待删"
-    this.maxCandles = Math.max(20, Math.floor(r.width/9));
+    this.maxPoints = this.TARGET_BARS;
+    this.reserveSpace();
     this.draw();
   },
 
+  /* 按浮窗实际高度给主内容留底，避免遮挡页面末尾 */
+  reserveSpace(){
+    const bar = $('#tkBar');
+    if(!bar) return;
+    const h = Math.ceil(bar.getBoundingClientRect().height);
+    if(h > 0) document.documentElement.style.setProperty('--tk-safe', (h + 14) + 'px');
+  },
+
+  async toggle(){ this.running ? this.stop() : this.start(); },
+
   async start(){
     if(this.running) return;
-    $('#tkStatus').textContent = '正在请求麦克风…';
+    this.setMsg('请求麦克风…');
     try{
       this.stream = await navigator.mediaDevices.getUserMedia({audio:true});
     }catch(e){
       const map = {
-        NotAllowedError:'麦克风权限被拒绝，请在地址栏允许后重试。',
-        NotFoundError:'没有检测到麦克风设备。',
-        NotReadableError:'麦克风被其他程序占用。',
-        SecurityError:'当前环境不允许录音，请改用本地 HTTP 服务打开。'
+        NotAllowedError:'麦克风被拒绝',
+        NotFoundError:'没有麦克风设备',
+        NotReadableError:'麦克风被占用',
+        SecurityError:'当前环境不允许录音'
       };
-      $('#tkStatus').textContent = map[e.name] || ('无法开启采集：'+e.name);
-      $('#tkBadge').textContent = '故障'; $('#tkBadge').classList.remove('live');
+      this.setMsg(map[e.name] || ('无法采集：'+e.name));
       return;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
-    if(!AC){ $('#tkStatus').textContent='浏览器不支持 Web Audio。'; return; }
+    if(!AC){ this.setMsg('不支持 Web Audio'); return; }
     if(!this.ac) this.ac = new AC();
     if(this.ac.state==='suspended'){ try{ await this.ac.resume(); }catch(e){} }
 
     this.node = this.ac.createMediaStreamSource(this.stream);
     this.analyser = this.ac.createAnalyser();
-    this.analyser.fftSize = 4096;   // 足够长的窗口，保证能测到 82Hz 一类的低音
+    this.analyser.fftSize = 4096;
     this.node.connect(this.analyser);
     this.buf = new Float32Array(this.analyser.fftSize);
 
-    this.candles = []; this.winPitches = []; this.winRms = 0;
+    this.points = []; this.winPitches = []; this.winRms = 0;
+    this.smoothHz = 0; this.lastClose = undefined;
     this.winStart = performance.now();
     this.running = true; this.tok++;
-    $('#tkStart').disabled = true; $('#tkStop').disabled = false;
-    $('#tkBadge').textContent = '交易中'; $('#tkBadge').classList.add('live');
-    $('#tkStatus').textContent = '采集中…开口说话看看走势';
+    this.seedRandom();   // 先铺满一条随机行情，真音高随后从右侧接上
+
+    $('#tkToggle').textContent = '停止';
+    $('#tkToggle').classList.add('on');
+    $('#tkDot').classList.add('live');
+    $('#tkBar').classList.add('live');
+    this.setMsg('采集中');
 
     const my = this.tok;
     const loop = ()=>{
       if(!this.running || my !== this.tok) return;
       this.analyser.getFloatTimeDomainData(this.buf);
       const {hz, rms} = this.detectPitch(this.buf, this.ac.sampleRate);
-      if(hz > 0){ this.winPitches.push(hz); }
+      if(hz > 0) this.winPitches.push(hz);
       this.winRms = Math.max(this.winRms, rms);
 
       const now = performance.now();
-      if(now - this.winStart >= this.WIN_MS){
-        this.commitCandle();
+      if(now - this.winStart >= this.SAMPLE_MS){
+        this.commit();
         this.winStart = now; this.winPitches = []; this.winRms = 0;
       }
       this.raf = requestAnimationFrame(loop);
@@ -3554,20 +3555,70 @@ const Ticker = {
     this.raf = requestAnimationFrame(loop);
   },
 
-  /* 把一个采样窗口聚合成一根 K 线 */
-  commitCandle(){
+  /* 点「开始」时先铺一条随机行情，让画面立刻有反应；
+     真实音高到来后从右侧逐根接上，随机数据自然被滚出左侧。
+     刻意做得不规则：多尺度随机游走 + 偶发跳变，避免看起来像正弦波。 */
+  seedRandom(){
+    const n = this.maxPoints || 100;
+    let close = 120 + Math.random()*90;
+    let drift = 0;                                  // 当前漂移速度，会自己变向
+    let jump = 0;                                   // 偶发跳变的余量
+    for(let i=0;i<n;i++){
+      const open = close;                           // 开盘 = 上一根收盘
+      // 漂移速度随机反转，形成长短不一的段落
+      drift += (Math.random()-0.5)*3.2;
+      drift *= 0.90;
+      if(Math.random() < 0.035) drift = (Math.random()-0.5)*22;   // 突然转向
+
+      // 偶发跳变：模拟换气、重音、破音
+      if(jump === 0 && Math.random() < 0.05) jump = (Math.random()-0.5)*46;
+      const step = jump*0.35;
+      jump -= step;
+
+      close += drift + step + (Math.random()-0.5)*7;   // 叠加逐点噪声
+      close = Math.max(this.MIN_HZ+8, Math.min(this.MAX_HZ-40, close));
+
+      // 影线 = 本窗口内的高低点，必须包住实体
+      const wick = 1.5 + Math.random()*9;
+      const hi = Math.max(open, close) + wick;
+      const lo = Math.min(open, close) - wick*(0.5 + Math.random()*0.5);
+
+      this.points.push({ o: open, c: close, hz: close, hi, lo, amp: (hi-lo)/2, seed:true });
+    }
+    // 从右往左展开的入场动画
+    this.intro = 0;
+    this._needFrame = true;
+    this.pumpFrame();
+    this.refresh();
+  },
+
+  /* 把一个采样窗口聚合成一根标准 K 线。
+     开盘 = 上一根的收盘；收盘 = 本窗口音高的中位数（抗离群）。
+     红绿由 收盘 vs 开盘 决定，影线 = 本窗口内的真实最高/最低音高。 */
+  commit(){
     const ps = this.winPitches;
-    if(!ps.length || this.winRms < this.MIN_RMS){ return; }
+    if(!ps.length || this.winRms < this.MIN_RMS) return;
     const sorted = ps.slice().sort((a,b)=>a-b);
     const med = sorted[Math.floor(sorted.length/2)];
-    const open = ps[0], close = ps[ps.length-1];
-    const high = sorted[sorted.length-1], low = sorted[0];
-    this.candles.push({o:open, c:close, h:high, l:low, mid:med, t:Date.now()});
-    // 超出可视区左侧边界的历史，直接裁掉
-    if(this.candles.length > this.maxCandles){
-      this.candles.splice(0, this.candles.length - this.maxCandles);
+
+    // 分位数削弱偶发检测误差，避免影线被一个错误采样点拉爆
+    const q = f => sorted[Math.min(sorted.length-1, Math.max(0, Math.floor(sorted.length*f)))];
+    const winLow = sorted.length > 3 ? q(0.05) : sorted[0];
+    const winHigh = sorted.length > 3 ? q(0.95) : sorted[sorted.length-1];
+
+    // 开盘价 = 上一根的收盘价（首根用本窗口中位数）
+    const open = this.lastClose !== undefined ? this.lastClose : med;
+    const close = med;
+    this.lastClose = close;
+
+    const hi = Math.max(winHigh, open, close);
+    const lo = Math.min(winLow, open, close);
+
+    this.points.push({ o: open, c: close, hz: close, hi, lo, amp: (hi-lo)/2 });
+    if(this.points.length > this.maxPoints){
+      this.points.splice(0, this.points.length - this.maxPoints);   // 超出左侧边界的裁掉
     }
-    this.paint();
+    this.refresh();
   },
 
   stop(){
@@ -3575,123 +3626,115 @@ const Ticker = {
     cancelAnimationFrame(this.raf);
     if(this.node){ try{ this.node.disconnect(); }catch(e){} this.node=null; }
     if(this.stream){ this.stream.getTracks().forEach(t=>t.stop()); this.stream=null; }
-    $('#tkStart').disabled = false; $('#tkStop').disabled = true;
-    $('#tkBadge').textContent = '休市'; $('#tkBadge').classList.remove('live');
-    if(this.candles.length) $('#tkStatus').textContent = '已收盘，可继续开盘或清空。';
-    else $('#tkStatus').textContent = '等待开盘…';
-  },
-
-  clear(){
-    this.candles = [];
-    ['tkPrice','tkDelta','tkOpen','tkHigh','tkLow','tkAmp'].forEach(id=>{
-      const el = $('#'+id); if(el) el.textContent='--';
-    });
-    const d = $('#tkDelta'); if(d) d.className='ticker-delta flat';
-    $('#tkVol').textContent = '0';
-    $('#tkAxisLo').textContent='--'; $('#tkAxisHi').textContent='--';
+    $('#tkToggle').textContent = '开始';
+    $('#tkToggle').classList.remove('on');
+    $('#tkDot').classList.remove('live');
+    $('#tkBar').classList.remove('live');
+    this.setMsg('已停止');
     this.draw();
   },
 
-  /* 更新顶部行情数字 */
-  paint(){
-    const cs = this.candles;
-    if(!cs.length) return;
-    const last = cs[cs.length-1];
-    const first = cs[0];
-    let hi = -Infinity, lo = Infinity;
-    for(const c of cs){ if(c.h>hi) hi=c.h; if(c.l<lo) lo=c.l; }
-    const price = Math.round(last.c);
-    const diff = last.c - first.o;
-    const pct = first.o ? (diff/first.o*100) : 0;
+  setMsg(t){ const el=$('#tkMsg'); if(el) el.textContent = t; },
 
-    $('#tkPrice').textContent = price;
-    const d = $('#tkDelta');
-    const sign = diff>0 ? '+' : '';
-    d.textContent = `${sign}${diff.toFixed(1)} (${sign}${pct.toFixed(2)}%)`;
-    d.className = 'ticker-delta ' + (Math.abs(pct)<0.15 ? 'flat' : (diff>0 ? 'up' : 'down'));
-    $('#tkOpen').textContent = Math.round(first.o);
-    $('#tkHigh').textContent = Math.round(hi);
-    $('#tkLow').textContent = Math.round(lo);
-    $('#tkAmp').textContent = (hi-lo).toFixed(1);
-    $('#tkVol').textContent = cs.length;
-    $('#tkAxisLo').textContent = Math.round(lo)+' Hz';
-    $('#tkAxisHi').textContent = Math.round(hi)+' Hz';
+  /* 更新数值并重绘。随机铺底阶段不显示数值，避免把假数据当成真实音高 */
+  refresh(){
+    const ps = this.points;
+    if(!ps.length) return;
+    const last = ps[ps.length-1];
+    const el = $('#tkVal');
+    if(el){
+      if(last.seed){
+        el.textContent = '预热';
+        el.classList.remove('hot');
+      } else {
+        el.textContent = Math.round(last.hz);
+        el.classList.toggle('hot', last.hz >= 220);   // 高音标红
+      }
+    }
     this.draw();
   },
 
-  /* 绘制 K 线。右端为最新，向左滚动；左边缘外的自动消失 */
+  /* 绘制红绿 K 线，从右向左滚动 */
   draw(){
     const cv = $('#tkCanvas');
     if(!cv) return;
     const ctx = cv.getContext('2d');
     const W = cv.width, H = cv.height, dpr = window.devicePixelRatio || 1;
     ctx.clearRect(0,0,W,H);
-
-    const PAD_T = 14*dpr, PAD_B = 20*dpr, PAD_R = 10*dpr, PAD_L = 10*dpr;
-    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
-    const cs = this.candles;
-
-    // 参考网格
-    ctx.strokeStyle = 'rgba(255,255,255,.055)';
-    ctx.lineWidth = 1;
-    for(let i=0;i<=4;i++){
-      const y = PAD_T + plotH*i/4;
-      ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(PAD_L+plotW,y); ctx.stroke();
-    }
-
-    if(!cs.length){
-      ctx.fillStyle = 'rgba(255,255,255,.22)';
-      ctx.font = `${13*dpr}px system-ui,-apple-system,sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText('开盘后开始绘制行情', W/2, H/2);
+    const ps = this.points;
+    if(!ps.length){
+      // 未开工：一条极淡的基线，表明此处有内容可激活（不抢戏）
+      ctx.strokeStyle = 'rgba(31,77,62,.14)';
+      ctx.lineWidth = dpr;
+      ctx.setLineDash([3*dpr, 5*dpr]);
+      ctx.beginPath(); ctx.moveTo(0, H-1); ctx.lineTo(W, H-1); ctx.stroke();
+      ctx.setLineDash([]);
       return;
     }
 
     let hi = -Infinity, lo = Infinity;
-    for(const c of cs){ if(c.h>hi) hi=c.h; if(c.l<lo) lo=c.l; }
-    const span = Math.max(hi-lo, 30);           // 至少 30Hz 视野，避免静音时抖动放大
+    for(const p of ps){ if(p.hi>hi) hi=p.hi; if(p.lo<lo) lo=p.lo; }
+    // 视觉量程用较大的下限，让同样的起伏看起来更平缓（不放大抖动）
+    const span = Math.max(hi-lo, this.MIN_SPAN);
     const mid = (hi+lo)/2;
     const top = mid + span/2, bot = mid - span/2;
-    const yOf = hz => PAD_T + plotH*(1 - (hz-bot)/(top-bot));
+    const PAD = 6*dpr;
+    const yOf = hz => PAD + (H-2*PAD) * (1 - (hz-bot)/(top-bot));
 
-    const slot = plotW / this.maxCandles;
+    const slot = W / this.maxPoints;
+    const n = ps.length;
+
+    // 入场进度：0→1，用于从右往左展开的动画
+    const prog = this.intro < 1 ? this.intro : 1;
+    const shown = Math.max(1, Math.ceil(n * prog));
+
+    // 红绿 K 线：每根蜡烛 = 一个采样窗口
+    // 实体 = 与前一根的涨跌；影线 = 窗口内高低点，长度带随机抖动（视觉噪音）
     const bw = Math.max(2*dpr, slot*0.62);
-
-    // 从右往左画：最后一根贴右边缘
-    for(let i=0;i<cs.length;i++){
-      const c = cs[i];
-      const fromRight = cs.length - 1 - i;
-      const x = PAD_L + plotW - slot*fromRight - slot/2;
-      if(x < PAD_L - slot) break;             // 左边界外，丢弃
-      const up = c.c >= c.o;
-      const col = up ? '#E4574A' : '#2E9E6B';
+    for(let i=0;i<shown;i++){
+      const x = W - slot*(n-1-i);
+      const p = ps[i];
+      const o = (p.o !== undefined) ? p.o : p.hz;
+      const c = (p.c !== undefined) ? p.c : p.hz;
+      // 标准 K 线着色：收盘高于开盘为涨（红），否则为跌（绿）
+      const up = c >= o;
+      const col = up ? '#C2453A' : '#2E8B62';
       ctx.strokeStyle = col; ctx.fillStyle = col;
-      // 影线
+
+      // 影线：本窗口内的真实最高/最低音高
       ctx.lineWidth = Math.max(1, dpr);
       ctx.beginPath();
-      ctx.moveTo(x, yOf(c.h)); ctx.lineTo(x, yOf(c.l)); ctx.stroke();
-      // 实体
-      const yO = yOf(c.o), yC = yOf(c.c);
-      const yTop = Math.min(yO,yC), hBody = Math.max(Math.abs(yC-yO), 1.2*dpr);
-      ctx.fillRect(x - bw/2, yTop, bw, hBody);
+      ctx.moveTo(x, yOf(p.hi)); ctx.lineTo(x, yOf(p.lo)); ctx.stroke();
+
+      // 实体：开盘 → 收盘
+      const yO = yOf(o), yC = yOf(c);
+      const bodyTop = Math.min(yO, yC);
+      const bodyH = Math.max(Math.abs(yC - yO), 1.4*dpr);   // 兜底，防完全重合时消失
+      ctx.fillRect(x - bw/2, bodyTop, bw, bodyH);
     }
 
-    // 最新价横线
-    const lastC = cs[cs.length-1];
-    const yLast = yOf(lastC.c);
-    ctx.strokeStyle = 'rgba(228,87,74,.5)';
-    ctx.setLineDash([5*dpr, 4*dpr]);
-    ctx.lineWidth = dpr;
-    ctx.beginPath(); ctx.moveTo(PAD_L,yLast); ctx.lineTo(PAD_L+plotW,yLast); ctx.stroke();
-    ctx.setLineDash([]);
+    // 末端标记当前值
+    const li = shown-1;
+    const ly = yOf(ps[li].hz);
+    ctx.beginPath(); ctx.arc(W - 1.5*dpr, ly, 2*dpr, 0, Math.PI*2);
+    ctx.fillStyle = ps[li].hz >= (ps[li-1] ? ps[li-1].hz : ps[li].hz) ? '#C2453A' : '#2E8B62';
+    ctx.fill();
+    // 入场动画推进
+    if(this.intro < 1){ this.intro = Math.min(1, this.intro + 0.055); this._needFrame = true; }
+  },
 
-    // 右侧价格标签
-    ctx.fillStyle = '#E4574A';
-    ctx.font = `bold ${11*dpr}px system-ui,-apple-system,sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.fillText(Math.round(lastC.c), PAD_L+plotW-4*dpr, Math.max(yLast-5*dpr, PAD_T+10*dpr));
+  /* 入场动画的帧驱动：仅在需要时自续，播完即停，不常驻占用 rAF */
+  pumpFrame(){
+    if(!this._needFrame) return;
+    this._needFrame = false;
+    this.draw();
+    if(this.intro < 1){
+      cancelAnimationFrame(this._introRaf);
+      this._introRaf = requestAnimationFrame(()=>{ this._needFrame = true; this.pumpFrame(); });
+    }
   }
 };
+
 
 const Quotes = {
   slots:[], INT:9000, order:[],
@@ -3774,14 +3817,11 @@ function initNav(){
   $('#goShadow').addEventListener('click',()=>Router.go('shadow'));
   $('#goChat').addEventListener('click',()=>Router.go('chat'));
   $('#goPhonetics').addEventListener('click',()=>Router.go('phonetics'));
-  const goTk = $('#goTicker'); if(goTk) goTk.addEventListener('click',()=>Router.go('ticker'));
-  $('#tkStart').addEventListener('click',()=>Ticker.start());
-  $('#tkStop').addEventListener('click',()=>Ticker.stop());
-  $('#tkClear').addEventListener('click',()=>Ticker.clear());
+  $('#tkToggle').addEventListener('click',()=>Ticker.toggle());
   let tkRaf=0;
   window.addEventListener('resize',()=>{
     cancelAnimationFrame(tkRaf);
-    tkRaf=requestAnimationFrame(()=>{ if(Router.current==='ticker') Ticker.resize(); });
+    tkRaf=requestAnimationFrame(()=>Ticker.resize());
   });
 }
 function init(){
