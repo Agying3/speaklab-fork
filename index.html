@@ -678,168 +678,90 @@ main{position:relative;z-index:1}
 }
 
 /* ---------- 响应式与动效偏好 ---------- */
-/* Copyright 2013 The Chromium Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file. */
+/* ============================================================
+   小恐龙卡片（T-Rex Runner）
+   ------------------------------------------------------------
+   代码来自 wayou/t-rex-runner，源自 Chromium，BSD-3-Clause。
+   上游 index.css 含 html/body/h1 等全局规则，会破坏本站布局，
+   故只保留必需部分，并全部限定在 #dinoCard 内。
+   ============================================================ */
+#offline-resources{display:none}
 
-html, body {
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  height: 100%;
+/* 卡片本体：与其它 .entry 卡片同尺寸，不因游戏而变大。
+   用 flex 纵向排列，让卡片高度由 .entry 的默认内边距和内容自然撑开。 */
+#dinoCard{
+  position:relative;
+  overflow:hidden;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  cursor:pointer;
+}
+/* 提示区在流内，占据卡片上部；游戏区在下部 */
+#dinoCard .dino-hint{
+  order:1;
+  padding:20px 22px 0;
+  pointer-events:none;
+  transition:opacity .28s ease, transform .28s ease;
+}
+#dinoCard .dino-stage{
+  order:2;
+  position:relative;
+  flex:1 1 auto;
+  min-height:119px;
+  margin-top:6px;
+  overflow:hidden;
+}
+#dinoCard .runner-container{
+  position:absolute;
+  left:0; top:0;
+  height:119px;
+  width:100%;
+  overflow:hidden;
+}
+#dinoCard .runner-canvas{
+  display:block;
+  height:119px;
+  width:100%;
+  image-rendering:pixelated;
+}
+#dinoCard .dino-hint b{
+  display:block;
+  font-size:16px;
+  font-weight:700;
+  color:var(--ink);
+  letter-spacing:.01em;
+}
+#dinoCard .dino-hint i{
+  display:block;
+  margin-top:3px;
+  font-style:normal;
+  font-size:12px;
+  color:var(--ink3);
+}
+#dinoCard.dino-active .dino-hint{
+  opacity:0;
+  transform:translateY(-4px);
 }
 
-.icon {
-  -webkit-user-select: none;
-  user-select: none;
-  display: inline-block;
+/* 上游 init() 会 querySelector 这两个元素，缺了会抛 TypeError */
+#dinoCard .icon-offline{display:none}
+
+/* 悬停与激活时的边框反馈 */
+#dinoCard:hover{border-color:var(--green-2)}
+#dinoCard.dino-active{border-color:var(--green-2);box-shadow:var(--shadow)}
+
+/* 游戏加载失败时的兜底提示 */
+#dinoCard.dino-broken::after{
+  content:'游戏加载失败';
+  position:absolute;left:0;right:0;bottom:38px;
+  text-align:center;font-size:12px;color:var(--ink3);
 }
 
-/* 上游的 .icon / .icon-offline 规则引用了 assets/ 下的外链图标，
-   本项目为单文件无外部资源，这里不保留（用 #dinoStage 内的隐藏占位元素满足 JS）。 */
-
-.hidden {
-  display: none;
-}
-
-
-/* Offline page */
-
-.offline .interstitial-wrapper {
-  color: #2b2b2b;
-  font-size: 1em;
-  line-height: 1.55;
-  margin: 0 auto;
-  max-width: 600px;
-  padding-top: 100px;
-  width: 100%;
-}
-
-.offline .runner-container {
-  height: 150px;
-  max-width: 600px;
-  overflow: hidden;
-  position: absolute;
-  top: 35px;
-  width: 44px;
-}
-
-.offline .runner-canvas {
-  height: 150px;
-  max-width: 600px;
-  opacity: 1;
-  overflow: hidden;
-  position: absolute;
-  top: 0;
-  z-index: 2;
-}
-
-.offline .controller {
-  background: rgba(247, 247, 247, .1);
-  height: 100vh;
-  left: 0;
-  position: absolute;
-  top: 0;
-  width: 100vw;
-  z-index: 1;
-}
-
-#offline-resources {
-  display: none;
-}
-
-@media (max-width: 420px) {
-  .suggested-left > #control-buttons, .suggested-right > #control-buttons {
-    float: none;
-  }
-  .snackbar {
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    border-radius: 0;
-  }
-}
-
-@media (max-height: 350px) {
-  h1 {
-    margin: 0 0 15px;
-  }
-  .icon-offline {
-    margin: 0 0 10px;
-  }
-  .interstitial-wrapper {
-    margin-top: 5%;
-  }
-  .nav-wrapper {
-    margin-top: 30px;
-  }
-}
-
-@media (min-width: 600px) and (max-width: 736px) and (orientation: landscape) {
-  .offline .interstitial-wrapper {
-    margin-left: 0;
-    margin-right: 0;
-  }
-}
-
-@media (min-width: 420px) and (max-width: 736px) and (min-height: 240px) and (max-height: 420px) and (orientation:landscape) {
-  .interstitial-wrapper {
-    margin-bottom: 100px;
-  }
-}
-
-@media (min-height: 240px) and (orientation: landscape) {
-  .offline .interstitial-wrapper {
-    margin-bottom: 90px;
-  }
-  .icon-offline {
-    margin-bottom: 20px;
-  }
-}
-
-@media (max-height: 320px) and (orientation: landscape) {
-  .icon-offline {
-    margin-bottom: 0;
-  }
-  .offline .runner-container {
-    top: 10px;
-  }
-}
-
-@media (max-width: 240px) {
-  .interstitial-wrapper {
-    overflow: inherit;
-    padding: 0 8px;
-  }
-}
-
-.arcade-mode,
-.arcade-mode .runner-container,
-.arcade-mode .runner-canvas {
-  image-rendering: pixelated;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.arcade-mode #buttons,
-.arcade-mode #main-content {
-  opacity: 0;
-  overflow: hidden;
-}
-
-.arcade-mode .interstitial-wrapper {
-  height: 100vh;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.arcade-mode .runner-container {
-  left: 0;
-  margin: auto;
-  right: 0;
-  transform-origin: top center;
-  transition: transform 250ms cubic-bezier(0.4, 0, 1, 1) 400ms;
-  z-index: 2;
+@media (max-width:720px){
+  #dinoCard .dino-stage,
+  #dinoCard .runner-container,
+  #dinoCard .runner-canvas{height:100px}
 }
 
 @media (max-width:640px){
@@ -923,12 +845,18 @@ html, body {
         <span class="e-desc">44 个国际音标卡：发音要领 + 例词点读 + 跟读判定，发音基础从这里开始。</span>
         <span class="e-go">进入音标卡 →</span>
       </button>
-      <button class="entry" id="goDino">
-        <span class="e-icon">🦖</span>
-        <span class="e-title">休息一下</span>
-        <span class="e-desc">练累了就跳两下。空格 / ↑ 起跳，↓ 下蹲，别撞上仙人掌。</span>
-        <span class="e-go">开局 →</span>
-      </button>
+      <div class="entry" id="dinoCard" role="button" tabindex="0"
+           aria-label="小恐龙：点击后用空格或方向键操作">
+        <div class="dino-hint">
+          <b>点我接手</b>
+          <i>空格 / ↑ 跳，↓ 蹲</i>
+        </div>
+        <div class="dino-stage">
+          <!-- 上游 init() 无条件 querySelector 这两个元素，缺了会抛 TypeError -->
+          <div class="icon icon-offline" aria-hidden="true"></div>
+          <div class="interstitial-wrapper"></div>
+        </div>
+      </div>
     </div>
 
     <div class="hidden" id="mistakesSection">
@@ -1269,7 +1197,7 @@ function closeModal(){
   try{ if(typeof ASR!=='undefined') ASR.stop(); }catch(e){}
   try{ if(typeof Recorder!=='undefined' && Recorder.state==='rec') Recorder.cancel(); }catch(e){}
   try{ if(typeof PhoneticsView!=='undefined') PhoneticsView.recOn=false; }catch(e){}
-  try{ if(typeof DinoGame!=='undefined') DinoGame.stop(); }catch(e){}
+  try{ if(typeof DinoCard!=='undefined') DinoCard.release(); }catch(e){}
   $('#modalRoot').innerHTML='';
 }
 
@@ -3987,7 +3915,7 @@ function initNav(){
   $('#goShadow').addEventListener('click',()=>Router.go('shadow'));
   $('#goChat').addEventListener('click',()=>Router.go('chat'));
   $('#goPhonetics').addEventListener('click',()=>Router.go('phonetics'));
-  { const d=$('#goDino'); if(d) d.addEventListener('click',()=>DinoGame.open()); }
+  DinoCard.init();
   $('#tkToggle').addEventListener('click',()=>Ticker.toggle());
   let tkRaf=0;
   window.addEventListener('resize',()=>{
@@ -6749,30 +6677,37 @@ function initNav(){
 // 原始代码：document.addEventListener('DOMContentLoaded', onDocumentLoad);
 
 /* ============================================================
-   19 · 小恐龙（休息一下）
+   19 · 卡片里的小恐龙（T-Rex Runner）
    ------------------------------------------------------------
    游戏代码来自 wayou/t-rex-runner（源自 Chromium），BSD-3-Clause，
-   完整许可见 dino/LICENSE。上游实现有两个与本站不合的地方，这里做适配：
-     1) 它在 DOMContentLoaded 时自动 new Runner('.interstitial-wrapper')，
-        本站改为点击卡片时才创建，避免每次开页都初始化 canvas 和音频；
-     2) Runner 是单例（Runner.instance_ 存在就直接返回旧实例），
-        而本站的弹窗每次关闭都会销毁 DOM，因此重开时必须丢掉旧实例。
-   键盘冲突：游戏监听空格/↑/↓，而本站的空格用于播报，故仅在弹窗打开
-   且焦点不在输入控件时转发按键，关闭弹窗立即解绑。
+   完整许可见 dino/LICENSE。
+
+   与上游的差异（也见 dino/README.md）：
+     1) 上游在 DOMContentLoaded 时自动 new Runner，本站改为进入视口
+        后才创建，且未点击时以「托管控件」自动跑，作为可点的提示；
+     2) Runner 是单例，重复创建会复用已销毁的 DOM，故停止时清 instance_；
+     3) init() 无条件 querySelector('.icon-offline').style，缺元素会抛
+        TypeError，故在卡片里放一个隐藏占位元素；
+     4) 上游 CSS 含 html/body/h1 全局规则，会破坏本站布局，故只保留
+        必要部分并限定在 #dinoCard 作用域内；
+     5) 游戏监听空格/↑/↓，而本站空格用于播报，故只在卡片激活时转发。
    ============================================================ */
-const DinoGame = {
+const DinoCard = {
   runner:null,
+  active:false,          // 是否已把操作权交给用户
+  io:null,               // IntersectionObserver：进入视口才启动演示
+  idleTimer:0,
   bound:false,
   onKeyDown:null,
   onKeyUp:null,
+  HOST_ID:'dinoCard',
 
-  /* 把按键转发给游戏实例；游戏自身靠 canvas 上的监听拿不到焦点事件 */
+  /* 键盘转发：只在卡片激活时生效，且焦点不在输入控件内 */
   attachKeys(runner){
     this.onKeyDown = e => {
-      if(!this.runner || this.runner !== runner) return;
+      if(!this.active || this.runner !== runner) return;
       const t = e.target;
       if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      // 只拦游戏用到的键，其余（如 Escape 关弹窗、Tab 切焦点）放行
       const k = e.key;
       if(k === ' ' || k === 'ArrowUp' || k === 'ArrowDown' || k === 'Spacebar'){
         e.preventDefault();
@@ -6780,7 +6715,7 @@ const DinoGame = {
       }
     };
     this.onKeyUp = e => {
-      if(!this.runner || this.runner !== runner) return;
+      if(!this.active || this.runner !== runner) return;
       const k = e.key;
       if(k === ' ' || k === 'ArrowUp' || k === 'ArrowDown' || k === 'Spacebar'){
         e.preventDefault();
@@ -6800,102 +6735,155 @@ const DinoGame = {
     this.onKeyDown = this.onKeyUp = null;
   },
 
-  /* 打开游戏弹窗 */
-  open(){
-    openModal(
-      '<div class="dino-head">' +
-        '<h3>🦖 休息一下</h3>' +
-        '<span class="dino-score">本次最高 <b id="dinoHi">0</b></span>' +
-      '</div>' +
-      // .icon / .icon-offline 是上游 init() 里直接 querySelector 的元素，
-      // 取不到就抛 TypeError，故这里放两个隐藏占位元素。
-      '<div id="dinoStage">' +
-        '<div class="icon icon-offline" aria-hidden="true"></div>' +
-        '<div class="interstitial-wrapper"></div>' +
-      '</div>' +
-      '<div class="dino-keys">' +
-        '<button id="dinoJump" type="button">↑ 跳</button>' +
-        '<button id="dinoDuck" type="button">↓ 蹲</button>' +
-      '</div>' +
-      '<p class="dino-note">空格 / ↑ 起跳，↓ 下蹲。撞上仙人掌就重来。游戏只在弹窗里跑，关掉不影响练习进度。</p>'
-    );
-    const modal = document.querySelector('#modalRoot .modal');
-    if(modal) modal.classList.add('modal-wide');
+  host(){ return document.getElementById(this.HOST_ID); },
 
-    this.start();
-    this.bindPad();
+  /* 卡片内容就位后调用：无人操作时让恐龙自己跑，作为「这里可以点」的提示 */
+  init(){
+    const host = this.host();
+    if(!host) return;
+
+    host.addEventListener('click', () => this.active ? this.release() : this.takeOver());
+    host.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        this.active ? this.release() : this.takeOver();
+      }
+    });
+
+    // 只在卡片可见时跑演示，滚出视口就停，别白烧 CPU
+    if('IntersectionObserver' in window){
+      this.io = new IntersectionObserver(entries => {
+        for(const en of entries){
+          if(en.isIntersecting){ if(!this.active) this.startDemo(); }
+          else if(!this.active){ this.stop(); }
+        }
+      }, { threshold:0.35 });
+      this.io.observe(host);
+    } else {
+      this.startDemo();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if(document.hidden){ this.stop(); }
+      else if(!this.active && this.isVisible()) this.startDemo();
+    });
   },
 
-  start(){
-    // 丢掉上次的单例，否则会复用已被销毁的旧 DOM
-    this.stop();
+  isVisible(){
+    const h = this.host();
+    if(!h) return false;
+    const r = h.getBoundingClientRect();
+    return r.top < window.innerHeight && r.bottom > 0 && r.height > 0;
+  },
+
+  /* 演示模式：托管控件每隔一会儿自动跳一下，看起来像有人在玩 */
+  startDemo(){
+    if(this.runner || this.active) return;
+    if(!this.create()) return;
+    this.scheduleIdleJump();
+  },
+
+  scheduleIdleJump(){
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      if(this.active || !this.runner) return;
+      this.press(' ');
+      this.scheduleIdleJump();
+    }, 900 + Math.random()*1100);
+  },
+
+  /* 第一次进入卡片时把游戏建起来 */
+  create(){
+    if(this.runner) return true;
+    const host = this.host();
+    if(!host) return false;
+    const stage = host.querySelector('.dino-stage');
+    if(!stage) return false;
     try{
       if(typeof TRexRunner === 'undefined') throw new Error('TRexRunner 未加载');
-      this.runner = new TRexRunner('#dinoStage .interstitial-wrapper');
-      Runner_forceResize(this.runner);
-      this.attachKeys(this.runner);
+      this.runner = new TRexRunner('#' + this.HOST_ID + ' .interstitial-wrapper');
+      this.fit();
+      return true;
     }catch(e){
-      const stage = document.querySelector('#dinoStage');
-      if(stage) stage.innerHTML = '<p class="dino-note" style="padding:20px">游戏加载失败：' + (e && e.message ? e.message : e) + '</p>';
+      host.classList.add('dino-broken');
       console.error('[dino]', e);
+      return false;
     }
   },
 
-  /* 触屏方向键 */
-  bindPad(){
-    const jump = document.querySelector('#dinoJump');
-    const duck = document.querySelector('#dinoDuck');
-    const press = (el, type) => {
-      if(!el) return;
-      const fire = ev => {
-        ev.preventDefault();
-        if(!this.runner) return;
-        const fake = { key: type === 'down' ? 'ArrowDown' : ' ', keyCode: type === 'down' ? 40 : 32, preventDefault(){} };
-        this.runner.onKeyDown(fake);
-      };
-      const release = ev => {
-        ev.preventDefault();
-        if(!this.runner) return;
-        const fake = { key: type === 'down' ? 'ArrowDown' : ' ', keyCode: type === 'down' ? 40 : 32, preventDefault(){} };
-        this.runner.onKeyUp(fake);
-      };
-      el.addEventListener('touchstart', fire, { passive:false });
-      el.addEventListener('touchend', release, { passive:false });
-      el.addEventListener('mousedown', fire);
-      el.addEventListener('mouseup', release);
-    };
-    press(jump, 'up');
-    press(duck, 'down');
+  /* 接管：标语淡出，键盘交给用户，同时自动起跳让它跑起来 */
+  takeOver(){
+    if(this.active) return;
+    if(!this.create()) return;
+    this.active = true;
+    clearTimeout(this.idleTimer);
+    const host = this.host();
+    if(host) host.classList.add('dino-active');
+    if(this.runner) this.attachKeys(this.runner);
+    this.press(' ');
+    this.fit();
   },
 
-  /* 停止游戏并彻底丢弃实例：Runner 是单例，必须清掉静态引用 */
+  /* 交还：停止操作，回到演示由托管接手 */
+  release(){
+    if(!this.active) return;
+    this.active = false;
+    this.detachKeys();
+    const host = this.host();
+    if(host) host.classList.remove('dino-active');
+    this.scheduleIdleJump();
+  },
+
+  /* 合成一次按键，用于托管自动跳和开局。
+     注意：上游 onKeyDown 的第一层判断是 `e.target != this.detailsButton`，
+     而本站没有 detailsButton（值为 null），若 target 也传 null 会让条件为假、
+     整段逻辑被跳过，故这里显式给一个不等于 null 的 target。 */
+  press(key){
+    const self = this;
+    const make = type => ({
+      key, code: key === 'ArrowDown' ? 'ArrowDown' : 'Space',
+      keyCode: key === 'ArrowDown' ? 40 : 32,
+      which: key === 'ArrowDown' ? 40 : 32,
+      type,
+      // 真正的 canvas 元素最贴近真实事件；退而求其次用卡片本身
+      target: (self.runner && self.runner.canvas) || self.host(),
+      currentTarget: (self.runner && self.runner.containerEl) || null,
+      preventDefault(){}
+    });
+    if(!this.runner) return;
+    this.runner.onKeyDown(make('keydown'));
+    setTimeout(() => { if(this.runner) this.runner.onKeyUp(make('keyup')); }, 80);
+  },
+
+  /* 整个丢掉实例；Runner 是单例，必须清静态引用，否则下次拿到死 DOM */
   stop(){
+    clearTimeout(this.idleTimer);
     this.detachKeys();
     const r = this.runner;
     if(r){
       try{ if(typeof r.stop === 'function') r.stop(); }catch(e){}
       try{
-        if(r.canvas && r.canvas.parentNode) r.canvas.parentNode.removeChild(r.canvas);
         if(r.containerEl && r.containerEl.parentNode) r.containerEl.parentNode.removeChild(r.containerEl);
       }catch(e){}
     }
     this.runner = null;
+    try{ if(typeof TRexRunner !== 'undefined' && TRexRunner.instance_) TRexRunner.instance_ = null; }catch(e){}
+  },
+
+  /* 跑道宽度贴合卡片，避免上游 600px 固定宽溢出或过窄 */
+  fit(){
     try{
-      if(typeof TRexRunner !== 'undefined' && TRexRunner.instance_) TRexRunner.instance_ = null;
+      const cat = this.host() && this.host().querySelector('.dino-stage');
+      const r = this.runner;
+      if(!cat || !r || !r.canvas) return;
+      const w = Math.max(220, Math.round(cat.clientWidth));
+      if(typeof r.resize === 'function') r.resize(w, r.canvas.height);
+      else r.canvas.width = w;
     }catch(e){}
   }
 };
 
-/* 游戏按容器宽度铺满跑道；上游默认 600px 固定宽，在弹窗里会溢出 */
-function Runner_forceResize(runner){
-  try{
-    const host = document.querySelector('#dinoStage');
-    if(!host || !runner || !runner.canvas) return;
-    const w = Math.max(300, Math.round(host.clientWidth));
-    if(typeof runner.resize === 'function') runner.resize(w, runner.canvas.height);
-    else { runner.canvas.width = w; }
-  }catch(e){}
-}
+window.addEventListener('resize', () => { if(DinoCard.runner) DinoCard.fit(); });
 
 function init(){
   Store.init();
