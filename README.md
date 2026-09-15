@@ -83,6 +83,7 @@ Four training modules + one learning loop:
 | 🔤 **Phoneme cards** | 44 IPA phonemes: category browsing, Chinese articulation tips, IPA-highlighted example words with slow playback, shadowing check (word-level judgment), progress |
 | 🏆 **Phoneme gauntlet** | 44 gates across 5 difficulty stages; **3 passes unlock the next gate**; progress bar + percentage + road map (passed ✓/current/locked), persisted & resettable |
 | 📈 **Stats page** | Streak / total practice / last-30 average + 12-week heatmap + score trend curve + daily goal progress & celebration + sentence score book |
+| 📉 **Voice ticker** | Your live pitch drawn as a candlestick chart: red = rising, green = falling, scrolling right-to-left with off-screen history trimmed. Independent capture chain; **no backend required** |
 | 📅 **Daily check-in window** | Auto-pops on the home page; DAY badge reopens it anytime; milestone celebrations at 7/14/30/50/100 days |
 | 💬 **Floating background quotes** | 2–3 watermark-style quotes float in empty background space (italic English + author + small Chinese translation), slow drift, staggered rotation; click-through; collapses to one on mobile; static under `prefers-reduced-motion` |
 | 🧠 **Sentence score memory** | Every sentence remembers best/last/count (persisted in localStorage); instant comparison after scoring (new record 🎉 / delta vs. last); "sentence score book" in stats (recent/weakest sort) + one-tap re-practice |
