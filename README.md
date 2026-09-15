@@ -7,8 +7,7 @@
 ![Stack](https://img.shields.io/badge/Stack-Vanilla%20HTML%2FCSS%2FJS-orange)
 ![Dependencies](https://img.shields.io/badge/Frontend-Zero%20third-party%20libs-brightgreen)
 ![Form](https://img.shields.io/badge/Form-Single%20file%20index.html-blue)
-![Speech](https://img.shields.io/badge/Speech-Web%20Speech%20API%20%2B%20optional%20local%20Whisper-9cf)
-![Tests](https://img.shields.io/badge/Automated%20tests-214%20assertions-success)
+![Speech](https://img.shields.io/badge/Speech-Web%20Speech%20API-9cf)
 ![Version](https://img.shields.io/badge/Version-v2.0-lightgrey)
 
 ---
@@ -50,7 +49,7 @@ SpeakLab is an English speaking practice web app for Chinese learners, combining
 **Evolution at a glance** (full version-by-version record in [Development History](#development-history)):
 
 ```
-Shadowing + scenario chat ──► word book / stats / listen&repeat / Whisper engine ──► phoneme cards + daily check-in
+Shadowing + scenario chat ──► word book / stats / listen&repeat ──► phoneme cards + daily check-in
     ──► per-sentence score memory ──► US/UK accents ──► smart Q&A (never blocks) ──► 3-level corpus
     ──► floating background quotes ──► phoneme gauntlet + auto-score on silence ──► strict scoring system (v2.0)
 ```
@@ -62,7 +61,7 @@ Four training modules + one learning loop:
 - **Phoneme Cards**: 44 IPA phonemes — free browsing (pronunciation tips + example words + shadowing check) and a **Gauntlet mode** (increasing difficulty, each gate needs 3 passes to unlock).
 - **Stats + Check-in + Memory**: heatmap, score trends, daily goal, check-in window, sentence score book — a complete daily practice loop.
 
-**Dual ASR engines**: browser built-in recognition (zero config) by default; optional bundled **local Whisper backend** — fully offline transcription, word-level timestamps and CMUdict phoneme comparison.
+**Browser built-in speech recognition** (zero config, provided by your browser vendor) is the only ASR path: word-level alignment, 3-dimension scoring and phoneme judgment all run on top of its transcript. No model to download, no backend to start.
 
 ---
 
@@ -72,17 +71,16 @@ Four training modules + one learning loop:
 |---|---|
 | 🎙 **Sentence shadowing** | 90-sentence corpus: 5 scenarios (Daily/Travel/Work/Interview/General) × 3 levels (Beginner/Intermediate/Advanced), each with Chinese gloss & pronunciation tip; independent scenario & level filters |
 | 🔴🟡🟢 **Per-word coloring** | Word-level alignment between recognition and target; green = good, yellow = close, red = wrong/missed; extra words marked with dashed border |
-| 👆 **Tap-to-hear** | Tap any word chip for 0.55× slow pronunciation; phoneme notation shown on hover with the Whisper engine |
+| 👆 **Tap-to-hear** | Tap any word chip for 0.55× slow pronunciation |
 | 📕 **Mistake word book** | Red/yellow words auto-collected (same word accumulates); tap to hear, "re-practice" jumps back to the sentence (auto-switching to its level); removed once read green |
-| 📊 **3-dimension scoring (strict)** | Accuracy / Fluency / Completeness + total; level coefficients (Intermediate ×0.97, Advanced ×0.93); real speaking rate shown with Whisper |
+| 📊 **3-dimension scoring (strict)** | Accuracy / Fluency / Completeness + total; level coefficients (Intermediate ×0.97, Advanced ×0.93) |
 | 🌊 **Waveform compare stage** | Target sentence rendered as a rhythm spectrum (syllables & stress) vs. your actual recording waveform |
 | ▶ **Demo playback** | Browser TTS with word-by-word highlight; **US/UK accent switch** (prefers matching voices, falls back gracefully) |
 | 🔁 **Recording & playback** | MediaRecorder + live level meter; 20s cap; phoneme practice auto-scores after ~2s of silence |
 | 💬 **Scenario conversations** | 6 scenarios × 2 modes: **Smart Q&A** (8-question bank per scenario, endless follow-ups, any answer advances, hit-rate stats) + **Guided Script** (dialogue tree + fallback guidance + suggestion buttons) |
 | 🎙 **Listen & repeat in chat** | Each tutor line can be shadowed & scored inside a modal; score chip on the bubble; can be disabled |
 | 🤖 **AI follow-up questions (optional)** | OpenAI-compatible LLM key (DeepSeek/OpenAI/Qwen/GLM presets); interviewer-style system prompt + correction cards + hints + translation |
-| 🖥 **Local Whisper engine (optional)** | Bundled `server/`: offline transcription + word timestamps + CMUdict phoneme comparison, mirror-friendly for CN networks; auto-falls-back to browser ASR |
-| 🔤 **Phoneme cards** | 44 IPA phonemes: category browsing, Chinese articulation tips, IPA-highlighted example words with slow playback, shadowing check (browser word-level / Whisper phoneme-level), progress |
+| 🔤 **Phoneme cards** | 44 IPA phonemes: category browsing, Chinese articulation tips, IPA-highlighted example words with slow playback, shadowing check (word-level judgment), progress |
 | 🏆 **Phoneme gauntlet** | 44 gates across 5 difficulty stages; **3 passes unlock the next gate**; progress bar + percentage + road map (passed ✓/current/locked), persisted & resettable |
 | 📈 **Stats page** | Streak / total practice / last-30 average + 12-week heatmap + score trend curve + daily goal progress & celebration + sentence score book |
 | 📅 **Daily check-in window** | Auto-pops on the home page; DAY badge reopens it anytime; milestone celebrations at 7/14/30/50/100 days |
@@ -96,9 +94,11 @@ Four training modules + one learning loop:
 
 ## Quick Start
 
-### Option 1: Double-click (simplest, browser engine)
+### Option 1: Double-click (simplest)
 
 Double-click `index.html` and open it in any modern browser (Chrome / Edge / Safari). **No install, no build** (except ASR & LLM features).
+
+Under `file://` the microphone is usable but the browser must be given permission manually, and browsers differ in how well that works (some will not offer it at all). If you run into permission problems, use the local HTTP server in Option 2 — a normal `http://127.0.0.1` origin has far fewer restrictions.
 
 ### Option 2: Local HTTP server (recommended; use your phone too)
 
@@ -112,25 +112,16 @@ npx serve -l 8090 .
 - Desktop: <http://127.0.0.1:8090/index.html>
 - Phone (same Wi-Fi): `http://<your-LAN-IP>:8090/index.html`
 
-### Option 3: Local Whisper engine (offline transcription + phoneme comparison, optional)
+### Option 3: Local HTTP server on a fixed port
 
-```bash
-cd server
-npm install        # installs @huggingface/transformers etc.
-npm start          # starts → http://127.0.0.1:8091
-```
-
-- Open `http://127.0.0.1:8091/index.html` (same origin auto-uses `/api`), or open elsewhere and set the backend URL in Settings → Speech Engine, then press "Test connection".
-- The model `Xenova/whisper-tiny.en` (~40MB) auto-downloads into `server/.cache/` on first call. Behind the GFW set the mirror first:
-  - Windows PowerShell: `$env:HF_ENDPOINT='https://hf-mirror.com'; npm start`
-  - Larger model (more accurate, slower): `$env:SPEAKLAB_MODEL='Xenova/whisper-base.en'; npm start`
-- When the backend is unavailable, shadowing automatically falls back to browser recognition with a toast.
+Already covered by Option 2 — `python -m http.server` or `npx serve` both work. Use this when you want a stable origin (e.g. microphone permission remembered across sessions).
 
 ### Environment
 
 - Desktop: latest Chrome / Edge; mobile: iOS 15+ Safari / Android Chrome 100+
-- ASR is provided by the browser vendor (see [Compatibility](#compatibility--edge-cases))
-- No CDNs, no external fonts — fully usable offline
+- ASR is provided by the browser vendor — enabling it sends your audio to that vendor (see [Compatibility](#compatibility--edge-cases) and [Privacy](#privacy))
+- No CDNs, no external fonts: the page itself loads no third-party resources
+- **Not fully offline**: speech recognition sends your audio to the browser vendor's service, and the optional AI coach sends your text to the LLM provider you configure
 
 ---
 
@@ -159,7 +150,7 @@ npm start          # starts → http://127.0.0.1:8091
 2. Browse: tap a card for the articulation tip; tap example words for 0.55× slow demo (target phoneme highlighted in IPA); 🎙 shadowing marks it "practiced".
 3. **Gauntlet**: 44 phonemes across 5 difficulty stages, starting from /ɪ/; each gate needs **3 passing shadowings** to unlock the next (🎉 celebration); progress bar, percentage and road map update live; progress persists and can be reset.
 4. **One tap is enough**: after speaking, ~2 seconds of silence auto-scores (or tap ■ Stop manually).
-5. Judgment: browser engine = word-level match; **Whisper engine = phoneme dictionary comparison** (e.g. "target /θ/ ✓ hit, recognized as /TH IH NG K/").
+5. Judgment: word-level match between the recognized transcript and the target word.
 
 ### Daily Check-in Window
 
@@ -174,7 +165,7 @@ Streak / total practice / last-30 average, a 12-week activity heatmap (darker = 
 ### Settings
 
 - **Demo speed**: 0.6–1.4×; **Accent**: 🇺🇸 US / 🇬🇧 UK (demo, tap-to-hear and phoneme examples all follow; falls back when no matching voice); **Sound effects**: toggle; **Daily goal**: 1–30 sentences.
-- **Speech engine**: browser built-in / local Whisper (needs `server/`, testable, auto-fallback).
+- **Speech engine**: your browser's built-in speech recognition (no backend, no setup).
 - **AI coach**: presets (DeepSeek / OpenAI / Qwen / GLM) or custom base URL + model + key; "Test connection" verifies. The key is stored only in your browser's localStorage.
 - **Data**: export/import JSON, clear everything.
 
@@ -219,15 +210,11 @@ speaklab/
 │       01 utils           02 localStorage (memory fallback)   03 sound FX
 │       04 ASR wrapper     05 TTS wrapper (highlight/US/UK)    06 recorder (level/silence)
 │       07 waveform render 08 scoring engine (strict)          09 shadowing corpus (90 sentences, 3 levels)
-│       10 chat scripts (6 scenarios + 48 Q&A)  10b phoneme data (44 phonemes + IPA→ARPA)  11 history
-│       11b mistake word book  11c sentence score memory (derived from history)  12 LLM client  12b engine switch (browser/Whisper)
+│       10 chat scripts (6 scenarios + 48 Q&A)  10b phoneme data (44 phonemes)  11 history
+│       11b mistake word book  11c sentence score memory (derived from history)  12 LLM client
 │       13 shadowing module  14 chat module (Q&A/script/AI/listen&repeat)  15 router & top bar
 │       16 history/settings views  16b stats view  16c phoneme view (incl. gauntlet)  16d daily check-in
 │       16e floating quotes  17 home & init
-└── server/ (optional: local Whisper engine, zero-framework Node.js)
-    ├── server.js         static hosting + /api/health + /api/transcribe + /api/score
-    ├── package.json      @huggingface/transformers + wavefile + cmu-pronouncing-dictionary
-    └── .cache/           model cache (auto-downloaded on first run, gitignored)
 ```
 
 ### Key implementations
@@ -244,15 +231,13 @@ speaklab/
 | Phoneme gauntlet | 5-stage 44-gate road map; per-gate pass counts persisted; 3 passes unlock the next gate; silence auto-scoring |
 | Stats | 12-week × 7-day heatmap (CSS grid, 4 color tiers) + Canvas score trend (mean line + colored endpoints) + daily goal progress |
 | LLM chat | OpenAI-compatible fetch from the browser (non-streaming, timeout); prompt demands "reply + JSON(hint/translation/correction)"; graceful errors |
-| Whisper backend | transformers.js + onnxruntime-node (CPU, int8); `Xenova/whisper-tiny.en` word timestamps; wavefile decoding; CMUdict (134k words) phoneme comparison; `HF_ENDPOINT` mirror support; degrades to sentence-level transcription when word timestamps are unavailable |
-| Engine switch | `voiceScore()` unified entry: Whisper first → on failure toast + browser fallback → text mode as last resort; backend health testable in Settings |
 | Storage | `speaklab.*` namespace, history capped at 1000 records; memory fallback in privacy mode |
 
 ---
 
 ## Scoring Algorithms
 
-> The browser engine's scores are **heuristic estimates** (the honest boundary of a free setup); the Whisper engine scores from real transcription + word timestamps and is closer to true pronunciation. Both engines are tuned to a **strict standard**, and the UI labels the active engine and level coefficient.
+> Scores are **heuristic estimates** derived from the recognition transcript, confidence and timing — the honest boundary of a free, backend-free setup. They are tuned to a **strict standard**, and the UI labels the level coefficient.
 
 ### Browser engine
 
@@ -262,12 +247,9 @@ speaklab/
 4. **Fluency** = 0.5×rate score (vs. 150 wpm, deviation penalty ×1.6) + 0.3×pause score (penalty ×3.2) + 0.2×hesitation score (−0.25 per um/uh, floor 0.15).
 5. **Total** = 0.5×accuracy + 0.3×fluency + 0.2×completeness; **level coefficients**: Intermediate ×0.97, Advanced ×0.93. Total colors at 85/70. In text mode fluency is unavailable → 0.65×accuracy + 0.35×completeness.
 
-### Local Whisper engine (server/)
+### Text mode
 
-1. **Transcription**: whisper-tiny.en with word-level timestamps (true rate, inter-word pauses, word durations).
-2. **Word-level phoneme comparison**: target & recognized words are looked up in CMUdict (134k words) → phoneme edit distance → word phoneme score; word duration is compared to "phoneme count × 0.09s + 0.18s" (deviation penalty ×1.6) to catch rushed/slurred words.
-3. **Word score** = **0.7×phoneme score + 0.3×duration score** (identical words); different words score phoneme similarity ×0.7. Hovering a chip shows reference phonemes. Green ≥ 0.82, yellow ≥ 0.6.
-4. **Fluency** = 0.5×rate (deviation ×1.6) + 0.3×pause (gaps > 0.3s, penalty ×3.2) + 0.2×constant; **total** = 0.5×accuracy + 0.3×fluency + 0.2×completeness with the same **level coefficients**, plus a real speaking-rate label (wpm).
+When no microphone or recognition is available, type what you read: completeness, accuracy and total all score normally (fluency is unavailable by design, since there is no timing information).
 
 ---
 
@@ -286,7 +268,6 @@ speaklab/
 | ASR network error (common with CN Chrome) | Clear guidance to switch to Edge or text mode |
 | Microphone permission denied | Guidance + text mode remains usable |
 | Nothing heard / too short | "Didn't catch that, try again" — no score produced |
-| Whisper backend down / model download failed | Toast + **automatic fallback to browser ASR**; text mode as last resort |
 | LLM key missing / timeout / rate-limited / CORS blocked | Clear error, end conversation and fall back to script mode |
 | Page hidden | Recording stops, state resets (timestamp-based, no drift) |
 | localStorage unavailable | In-memory fallback — usable but not persistent |
@@ -298,14 +279,15 @@ speaklab/
 
 - ASR audio is transcribed by the browser vendor's service only while you're recording; practice recordings are used **locally** for scoring & playback and are never auto-uploaded.
 - LLM requests go directly from your browser to your chosen provider; the key lives only in your browser's localStorage.
-- Whisper engine audio only travels to **your own machine** running `server/`, never leaving your LAN.
 - All practice data stays in your browser and can be exported/cleared anytime.
 
 ---
 
 ## Testing & Verification
 
-Full automated verification with **playwright-core + system Chrome** (`cd .pwtools && npm i playwright-core && node test.js`, needs the HTTP server running). Tests inject fake SpeechRecognition / speechSynthesis and a fake microphone; Whisper and LLM are mocked via route interception — fully deterministic, **214 assertions**:
+> **Note on test code**: the automated test suite described below was written during development but **was never committed to this repository** — `.pwtools/` has been gitignored since the first commit. The behavioural descriptions are kept here as a record of what was verified; **you cannot run them from a clone**. Contributions that bring a runnable test suite into the repo are welcome.
+
+The suite used **playwright-core + system Chrome** (needs the HTTP server running). Tests inject fake SpeechRecognition / speechSynthesis and a fake microphone; LLM calls are mocked via route interception — fully deterministic:
 
 - **Load/home**: title, daily sentence, streak, entry cards, demo playback & meter animation
 - **Scoring engine**: perfect reading (completeness 1, accuracy 0.855, total ≈90), complete miss (all red + extras), half reading (6 green 3 red), text-mode total formula, **strictness specifics** (low-confidence correct reading → all yellow, Intermediate ×0.97 / Advanced ×0.93 coefficients)
@@ -318,8 +300,7 @@ Full automated verification with **playwright-core + system Chrome** (`cd .pwtoo
 - **Stats page**: overview numbers, 84-cell heatmap, trend chart, daily goal progress & celebration, settings linkage
 - **Listen & repeat**: bubble button → modal scoring → score chip → history → button disappears when toggled off
 - **Chat recording input cleanup**: interim shown while recording, input cleared when stopping without a result, cleared after sending (regression test)
-- **Whisper engine**: mocked backend (engine switch, connection test, full scoring pipeline, wpm/phoneme labels), unreachable backend falls back to browser engine
-- **Phoneme cards**: 44 cards & filters, articulation tips, IPA highlight, example playback, browser word-level and Whisper phoneme-level (/θ/ hit) judgments, practiced marks & progress, history
+- **Phoneme cards**: 44 cards & filters, articulation tips, IPA highlight, example playback, word-level judgments, practiced marks & progress, history
 - **Phoneme gauntlet**: 0/44 start, first gate /ɪ/, 44-dot road map, 3 passes unlock, persistence across reload, reset back to the first gate
 - **Silence auto-scoring**: single tap + pause → auto-score counted into the gate
 - **Daily check-in window**: auto-popup, state toggle, no repeat same day, DAY badge reopen, 7-day milestone celebration
@@ -329,7 +310,6 @@ Full automated verification with **playwright-core + system Chrome** (`cd .pwtoo
 - **Floating quotes**: three slots rendered, click-through, staggered auto-rotation, Chinese translations, static under reduced motion
 - **History/settings**: export download, clear, TTS rate slider, LLM presets, save/clear
 - **Mobile/edge**: 375px vertical full-flow with zero horizontal overflow, color-token pixel assertions, `prefers-reduced-motion`, `file://` direct open
-- **Real backend smoke** (manual): `/api/health`, `/api/transcribe` (word timestamps), `/api/score` (phoneme dictionary + all-red judgment + extra marking) — model downloaded via hf-mirror and inferred successfully
 - **Quality gate**: zero console errors / page errors throughout
 
 Screenshots are kept in `_screenshots/*.png` (home/scoring/chat summary/AI chat/settings/stats/phonemes/gauntlet/mobile etc.).
@@ -343,8 +323,8 @@ The project iterated in "requirements → design → implementation → automate
 | Version | Requirement | Implementation | Verified | Pitfalls fixed |
 |---|---|---|---|---|
 | **v1.0** initial release | Speaking practice web app: shadowing scoring + scenario chat, benchmarked against Liulishuo/ELSA/Speak | "Recording studio" design system, sentence shadowing + 3-dimension scoring + word chips + waveform compare, script + LLM dual chat modes, 60-sentence corpus + 6 scripts | 83 | ① modal missing its `.modal` wrapper (a real UI bug caught by tests) ② alignment forced unrelated words into "hits" (tightened similarity threshold + post-filter) ③ Chrome `utterance.voice` setter throws on foreign objects ④ favicon 404 caused console errors |
-| **v1.1** feature round | Tap-to-hear + word book, stats page, listen & repeat in chat, local Whisper phoneme-level scoring | Word book auto-collect/remove, heatmap + trends + daily goal, modal listen & repeat, `server/` backend (transformers.js + CMUdict), engine switching | 120 | ① `onnx-community` export lacks cross-attention → no word timestamps → switched to `Xenova/whisper-tiny.en` ② wavefile v11 renamed properties (`wav.fs`→`wav.fmt`) ③ cmudict package uses named export ④ sandbox EPERM/network limits → escalated permissions + hf-mirror |
-| **v1.2** phoneme cards + check-in | 44 phoneme cards; daily check-in window | Phoneme data (incl. IPA→ARPABET map), category browse + shadowing check, check-in card + milestones (7/14/30/50/100) | 143 | ① practice state machine had `busy=true` while recording, blocking the second click → reworked busy semantics |
+| **v1.1** feature round | Tap-to-hear + word book, stats page, listen & repeat in chat | Word book auto-collect/remove, heatmap + trends + daily goal, modal listen & repeat | 120 | ① practice's scoring thresholds were too loose for short words |
+| **v1.2** phoneme cards + check-in | 44 phoneme cards; daily check-in window | Phoneme data (incl. phoneme symbol tables), category browse + shadowing check, check-in card + milestones (7/14/30/50/100) | 143 | ① practice state machine had `busy=true` while recording, blocking the second click → reworked busy semantics |
 | **v1.3** sentence score memory | Remember every sentence's score and compare progress | History-derived sentence memory (best/last/count), card chips, new-record/delta feedback, stats score book | 155 | ① README corpus count typo (72 sentences/6 scenes → actually 60/5) |
 | **v1.4** US/UK accents | Accent preference for demos | TTS voices ranked by US/UK preference lists, utterance.lang synced, persisted | 162 | — |
 | **v1.5** recording input cleanup | Chat input kept leftover recognition text after recording | ASR stops pushing results to UI after stop + stopMic unconditionally clears the input | 166 | ① mic button's own pulse animation made Playwright judge it "unstable" → animation moved to a `::after` ring |
@@ -365,9 +345,7 @@ The project iterated in "requirements → design → implementation → automate
 | Smart Q&A bank | **48 questions** | 8 per scenario (question + suggested answer + Chinese translation) |
 | Phoneme cards | **44 phonemes** | 12 monophthongs + 8 diphthongs + 24 consonants; each with articulation tip + 2 example words (IPA highlighted) |
 | Gauntlet road | **44 gates × 5 stages** | Monophthongs → diphthongs → consonants easy/mid/hard |
-| IPA→ARPABET map | **45 entries** | For Whisper phoneme judgment |
 | Floating quotes | **24 quotes** | Language/learning themed (English + author + Chinese translation) |
-| Pronunciation dictionary | **134k words** | CMUdict (server-side, phoneme comparison) |
 
 ---
 
@@ -379,24 +357,20 @@ speaklab/
 ├── README.md           # English documentation (this file)
 ├── README.zh-CN.md     # 完整中文文档
 ├── LICENSE             # MIT
-├── .gitignore          # excludes .pwtools/ server/node_modules/ server/.cache/ etc.
-├── server/             # optional: local Whisper engine (zero-framework Node.js)
-│   ├── server.js       # static hosting + /api/health + /api/transcribe + /api/score
-│   ├── package.json    # @huggingface/transformers + wavefile + cmu-pronouncing-dictionary
-│   └── .cache/         # model cache (auto-downloaded, gitignored)
-├── .pwtools/           # dev-time Playwright tests (not committed)
-│   └── test.js         # 22 test sections · 214 assertions
-└── _screenshots/       # automated test screenshots
+├── .gitignore          # excludes .pwtools/ (dev-time test scripts) etc.
+├── docs/               # technical assessment, audit reports and a change plan
+└── _screenshots/       # screenshots
 ```
 
 ---
 
 ## Known Limitations
 
-1. **Browser-engine scores are heuristic estimates**: recognition text + confidence + rate/pauses can't tell "read correctly but misrecognized" apart from true errors; for phoneme-level feedback use the local Whisper engine (its word-level phoneme comparison is likewise dictionary-inferred, not a per-phoneme acoustic model).
-2. **Whisper tiny model is small**: short words and fast speech may be misrecognized; switch to base/small for better accuracy at the cost of speed.
+1. **Scores are heuristic estimates**: recognition text + confidence + rate/pauses can't tell "read correctly but misrecognized" apart from true errors. There is no phoneme-level acoustic analysis.
+2. **Recognition accuracy varies**: short words and fast speech may be misrecognized; accuracy depends on the browser vendor's ASR service.
 3. **Word highlighting is estimated**: browser TTS provides no precise word timestamps.
-4. **CN networks**: Chrome's built-in ASR relies on Google services and may be unstable; prefer Edge or the Whisper engine.
+4. **CN networks**: Chrome's built-in ASR relies on Google services and may be unstable; Edge generally works better in mainland China.
+5. **`file://` differences**: opening `index.html` directly makes the microphone available, but permission behaviour varies by browser; if recording doesn't start, serve the folder over HTTP instead (Quick Start Option 2).
 5. **Single-browser storage**: data lives in localStorage with no account system; clearing the browser loses data (export JSON first).
 6. **LLM direct calls depend on provider CORS**: some providers block browser direct calls; switch providers or use script mode.
 
@@ -412,7 +386,6 @@ speaklab/
 - [ ] Spaced-repetition review queue (sentence score memory + SM-2-style scheduling)
 - [ ] XP levels + achievement badge wall
 - [ ] LLM streaming replies (typewriter effect)
-- [ ] Bigger Whisper models + true phoneme-level forced alignment (wav2vec2)
 - [ ] PWA (offline cache + add to home screen)
 
 ---
