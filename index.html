@@ -854,7 +854,7 @@ main{position:relative;z-index:1}
       <div class="scene-bar" id="phonCatBar"></div>
       <div class="ph-grid" id="phGrid"></div>
     </div>
-    <p class="note" style="margin-top:12px">※ 点卡片看发音要领，点例词听慢速示范；「跟读」判定：浏览器引擎按词级比对，Whisper 引擎按音素词典比对。闯关模式：难度依次递进，每个音标通过 3 次过关并解锁下一关。</p>
+    <p class="note" style="margin-top:12px">※ 点卡片看发音要领，点例词听慢速示范；「跟读」判定按词级比对。闯关模式：难度依次递进，每个音标通过 3 次过关并解锁下一关。</p>
   </section>
 
   <!-- ============ 统计 ============ -->
@@ -941,31 +941,6 @@ main{position:relative;z-index:1}
       </div>
 
       <div class="card">
-        <p style="font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">语音引擎</p>
-        <p style="font-size:13px;color:var(--ink3);margin-bottom:14px">
-          跟读评分的识别引擎。「本地 Whisper」需先启动 <b>speaklab/server</b> 后端（<code>npm install &amp;&amp; npm start</code>），
-          模型首次自动下载约 40MB（国内网络可在启动前设置 <code>HF_ENDPOINT=https://hf-mirror.com</code>）。
-          引擎不可用时自动回退浏览器识别。
-        </p>
-        <div class="fld">
-          <label for="engineSel">识别引擎</label>
-          <select id="engineSel">
-            <option value="auto">浏览器内置（零配置）</option>
-            <option value="whisper">本地 Whisper（离线转写 + 词级时间戳 + 音素对比）</option>
-          </select>
-        </div>
-        <div class="fld">
-          <label for="whisperUrl">后端地址（留空 = 同源 /api，适用于从 server 打开的页面）</label>
-          <input id="whisperUrl" placeholder="http://127.0.0.1:8091" spellcheck="false">
-        </div>
-        <div class="controls" style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn small" id="btnEngineSave">保存</button>
-          <button class="btn ghost small" id="btnEngineTest">测试连接</button>
-        </div>
-        <p class="llm-status" id="engineStatus"></p>
-      </div>
-
-      <div class="card">
         <p style="font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">AI 教练（可选）</p>
         <p style="font-size:13px;color:var(--ink3);margin-bottom:14px">
           填入你自己的 LLM API Key 后，场景对话升级为 AI 自由对话 + 纠错 + 地道表达。
@@ -1040,7 +1015,13 @@ function openModal(html){
   document.addEventListener('keydown',escH);
   return back;
 }
-function closeModal(){ $('#modalRoot').innerHTML=''; }
+function closeModal(){
+  /* 关闭弹层时释放麦克风与识别：否则录音持续、且下次「跟读」会用遗留转写评分 */
+  try{ if(typeof ASR!=='undefined') ASR.stop(); }catch(e){}
+  try{ if(typeof Recorder!=='undefined' && Recorder.state==='rec') Recorder.cancel(); }catch(e){}
+  try{ if(typeof PhoneticsView!=='undefined') PhoneticsView.recOn=false; }catch(e){}
+  $('#modalRoot').innerHTML='';
+}
 
 /* ============================================================
    02 · 本地存储（隐私模式降级为内存）
@@ -1875,14 +1856,6 @@ const PHONEMES = [
   {sym:'w', cat:'辅音', name:'半元音 乌', tip:'双唇收圆像短促的"乌"，快速滑向后面的元音。',
    ex:[{w:'we', ipa:'wiː', zh:'我们'},{w:'work', ipa:'wɜːrk', zh:'工作'}]}
 ];
-/* IPA 音标 → CMUdict ARPABET 映射（Whisper 引擎音素判定用） */
-const IPA2ARPA = {
-  'iː':'IY','ɪ':'IH','e':'EH','æ':'AE','ɑː':'AA','ɒ':'AA','ɔː':'AO','ʊ':'UH','uː':'UW',
-  'ʌ':'AH','ɜː':'ER','ə':'AH','eɪ':'EY','aɪ':'AY','ɔɪ':'OY','əʊ':'OW','aʊ':'AW',
-  'ɪə':'IHR','eə':'EHR','ʊə':'UHR','p':'P','b':'B','t':'T','d':'D','k':'K','g':'G',
-  'f':'F','v':'V','θ':'TH','ð':'DH','s':'S','z':'Z','ʃ':'SH','ʒ':'ZH','h':'HH',
-  'tʃ':'CH','dʒ':'JH','m':'M','n':'N','ŋ':'NG','l':'L','r':'R','j':'Y','w':'W'
-};
 const PHON_CATS = ['全部','单元音','双元音','辅音'];
 /* 闯关路线：44 个音标按难度递进，分 5 个阶段 */
 const PHON_GATE_STAGES = [
@@ -2060,66 +2033,8 @@ function simSentence(a,b){
   return dp[n][m]/Math.max(n,m);
 }
 
-/* ============================================================
-   12b · 语音引擎切换（浏览器内置 / 本地 Whisper 后端）
-   ============================================================ */
-const Engine = {
-  mode(){ return Store.get('engine','auto'); },
-  base(){ return String(Store.get('whisperUrl','')||'').trim().replace(/\/+$/,''); },
-  endpoint(p){ return this.base()+p; },
-  async health(url){
-    const base = url!==undefined ? String(url).trim().replace(/\/+$/,'') : this.base();
-    const res=await fetch(base+'/api/health',{signal:AbortSignal.timeout(8000)});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    return res.json();
-  },
-  async scoreAudio(blob, target, level=1){
-    const b64=await blobToBase64(blob);
-    const res=await fetch(this.endpoint('/api/score'),{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({audio:b64, target, level}),
-      signal:AbortSignal.timeout(180000)
-    });
-    if(!res.ok){
-      let m='HTTP '+res.status;
-      try{ const j=await res.json(); if(j.error) m+=' · '+j.error; }catch(e){}
-      throw new Error(m);
-    }
-    const j=await res.json();
-    if(!j.words || j.total==null) throw new Error('响应格式异常');
-    return j;
-  }
-};
-function blobToBase64(blob){
-  return new Promise((res,rej)=>{
-    const r=new FileReader();
-    r.onload=()=>{ const s=String(r.result); res(s.slice(s.indexOf(',')+1)); };
-    r.onerror=()=>rej(new Error('读取音频失败'));
-    r.readAsDataURL(blob);
-  });
-}
-/* 后端结果 → 前端 scoreShadow 同构结构 */
-function adaptServerResult(sr){
-  return {
-    targetWords: sr.targetWords || tokenize(sr.text||''),
-    words: (sr.words||[]).map(w=>({text:w.text, score:w.score, status:w.status, refPhon:w.refPhon||null, saidPhon:w.saidPhon||null})),
-    extras: sr.extras||[],
-    accuracy: sr.accuracy, fluency: sr.fluency, completeness: sr.completeness, total: sr.total,
-    wpm: sr.wpm, duration: sr.duration, engine: sr.engine||'whisper-local', level: sr.level||1
-  };
-}
-/* 统一语音评分入口：Whisper 引擎优先，失败回退浏览器识别 */
+/* 统一语音评分入口：浏览器内置识别 + 启发式评分 */
 async function voiceScore(target, rec, transcript, level=1){
-  if(Engine.mode()==='whisper' && rec.blob){
-    try{
-      const sr=await Engine.scoreAudio(rec.blob, target, level);
-      const r=adaptServerResult(sr);
-      r.transcript=sr.text||transcript;
-      return r;
-    }catch(e){
-      toast('本地 Whisper 不可用（'+String(e.message||e).slice(0,90)+'），已回退浏览器识别');
-    }
-  }
   if(!transcript) return null;
   return scoreShadow({target, transcript, conf:ASR.conf, durMs:rec.durMs, silMs:rec.silMs, level});
 }
@@ -2148,7 +2063,12 @@ const ShadowApp = {
     $('#btnDemo').addEventListener('click',()=>this.playDemo());
     $('#btnRetry').addEventListener('click',()=>this.reset());
     $('#btnPlay').addEventListener('click',()=>{ if(this.blobUrl) playBlob(this.blobUrl); });
-    $('#btnNext').addEventListener('click',()=>{ this.idx=(this.idx+1)%this.list().length; this.reset(); this.renderSentence(); });
+    $('#btnNext').addEventListener('click',()=>{
+      if(this.phase==='recording' || this.phase==='processing') return;
+      this.idx=(this.idx+1)%this.list().length;
+      this.reset();
+      this.renderSentence();
+    });
     $('#btnTextScore').addEventListener('click',()=>this.scoreFromText());
     $('#textInput').addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); this.scoreFromText(); } });
     // 逐词色块点击听标准发音（慢速）
@@ -2288,8 +2208,7 @@ const ShadowApp = {
     }
     $('#recTimer').textContent='00:00';
     $('#levelBar').querySelector('i').style.width='0%';
-    // 统一评分：Whisper 引擎优先（内部含回退）
-    if(Engine.mode()==='whisper' && r.blob) this.setStatus('WHISPER · 本地模型转写中…');
+    // 统一评分：浏览器内置识别 + 启发式评分
     const res=await voiceScore(this.cur().en, r, transcript, this.cur().lv);
     if(res){
       this.renderScore(res);
@@ -2357,7 +2276,7 @@ const ShadowApp = {
     let mistNote='';
     if(added>0) mistNote += `📕 已自动收录 ${added} 个易错词到单词本。`;
     if(mastered.length) mistNote += ` 🎉 已掌握「${mastered.join('、')}」，已从单词本移除。`;
-    if(r.wpm) mistNote += (mistNote?' ':'')+`🎚 语速 ${r.wpm} 词/分（${r.engine==='whisper-local'?'Whisper 本地引擎':'本地估算'}）`;
+    if(r.wpm) mistNote += (mistNote?' ':'')+`🎚 语速 ${r.wpm} 词/分（本地估算）`;
     if(r.level===3) mistNote += (mistNote?' ':'')+'· 高级句难度系数 ×0.93';
     else if(r.level===2) mistNote += (mistNote?' ':'')+'· 中级句难度系数 ×0.97';
     const mn=$('#mistNote');
@@ -2610,7 +2529,6 @@ const ChatApp = {
         FX.recStop();
         $('#msRec').textContent='● 录音';
         $('#msStatus').classList.remove('rec');
-        if(Engine.mode()==='whisper' && rec.blob) $('#msStatus').textContent='本地模型转写中…';
         const res=await voiceScore(text, rec, transcript);
         if(!res){
           $('#msStatus').textContent='没听清，点「录音」再试一次';
@@ -2898,29 +2816,6 @@ const SettingsView = {
     goal.value=Store.get('dailyGoal',5);
     $('#dailyGoalVal').textContent=String(goal.value);
     goal.addEventListener('input',()=>{ Store.set('dailyGoal',+goal.value); $('#dailyGoalVal').textContent=String(goal.value); });
-    // 语音引擎
-    $('#engineSel').value=Engine.mode();
-    $('#whisperUrl').value=Store.get('whisperUrl','');
-    $('#btnEngineSave').addEventListener('click',()=>{
-      Store.set('engine',$('#engineSel').value);
-      Store.set('whisperUrl',$('#whisperUrl').value.trim());
-      const st=$('#engineStatus');
-      st.textContent='已保存 · 当前引擎：'+(Engine.mode()==='whisper'?'本地 Whisper':'浏览器内置');
-      st.className='llm-status ok';
-      toast('引擎设置已保存');
-    });
-    $('#btnEngineTest').addEventListener('click',async()=>{
-      const st=$('#engineStatus');
-      st.textContent='检测中…'; st.className='llm-status';
-      try{
-        const h=await Engine.health($('#whisperUrl').value);
-        st.textContent='后端在线 ✓ '+h.engine+' · '+h.model+(h.loaded?'（模型已加载）':'（首次调用时加载模型）');
-        st.className='llm-status ok';
-      }catch(e){
-        st.textContent='后端不可达：'+e.message+'。请先在 speaklab/server 目录运行 npm install && npm start。';
-        st.className='llm-status err';
-      }
-    });
     // LLM 预设
     this.renderPresets();
     const c=LLM.cfg();
@@ -3303,7 +3198,6 @@ const PhoneticsView = {
     let rec=null;
     try{ rec=await Recorder.stop(); }catch(e){ rec={blob:null,durMs:0,silMs:0}; }
     FX.recStop();
-    if(Engine.mode()==='whisper' && rec.blob) fbEl.textContent='本地模型转写中…';
     const res=await voiceScore(word, rec, transcript);
     if(!res){
       this.busy=false;
@@ -3326,18 +3220,8 @@ const PhoneticsView = {
     /* 闯关模式下不整面板重渲染（会抹掉反馈），由 onPass 回调刷新 */
     if(this.mode==='browse') this.render();
   },
-  /* 判定：Whisper 引擎按音素词典对比（IPA→ARPABET），浏览器引擎按词级比对 */
+  /* 判定：按词级比对 */
   judge(word, phon, res){
-    if(res.engine==='whisper-local'){
-      const w0=res.words && res.words[0];
-      const arpa=IPA2ARPA[phon];
-      if(w0 && w0.saidPhon && w0.saidPhon.length && arpa){
-        const hit=w0.saidPhon.includes(arpa);
-        return {hit, text:`音素对比：目标 /${phon}/ ${hit?'命中':'未命中'}（识别为 /${w0.saidPhon.join(' ')}/）`};
-      }
-      const hit=!!(w0 && w0.status==='good');
-      return {hit, text:hit?'这个词读对了！':'没读对，听一听示范再试一次'};
-    }
     const w0=res.words && res.words[0];
     const hit=!!(w0 && w0.status==='good');
     return {hit, text:hit?'这个词读对了！':'没读对，听一听示范再试一次'};

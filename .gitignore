@@ -1,7 +1,3 @@
-.pwtools/
+﻿.pwtools/
 .check.js
 .lastrun.txt
-server/node_modules/
-server/.cache/
-server/.npm-cache/
-
