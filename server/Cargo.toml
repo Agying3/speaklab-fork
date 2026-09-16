@@ -9,10 +9,18 @@ publish      = false
 
 [dependencies]
 # Web 框架与运行时
-axum = { version = "0.7", features = ["macros", "multipart"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "fs"] }
+axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "fs", "process", "time", "sync"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "limit", "compression-gzip"] }
 hyper = "1"
+
+# 云游戏串流：后端直接跟浏览器说 CDP，不经过 Playwright。
+# tokio-tungstenite 的版本要跟 axum 的 ws 依赖对齐（0.24），
+# 否则会同时编进两份，白白多一个依赖。
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+# 只用来问浏览器的调试端口开了没，不需要 rustls 那一套
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 
 # 序列化
 serde = { version = "1", features = ["derive"] }

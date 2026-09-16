@@ -3,6 +3,7 @@
 //! 所有接口挂在 `/api/v1` 下。版本号写进路径是为了以后改结构时
 //! 老版本还能继续服务，不用逼客户端一起升级。
 
+pub mod cloud;
 pub mod health;
 pub mod practices;
 
@@ -22,6 +23,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/v1/practices/stats", get(practices::stats))
         .route("/api/v1/practices/:id", delete(practices::delete))
         .route("/api/v1/asr", post(practices::transcribe))
+        // 云游戏串流
+        .route("/api/v1/cloud", get(cloud::list))
+        .route("/api/v1/cloud/:target", delete(cloud::stop))
+        .route("/api/v1/cloud/:target/profile", delete(cloud::forget))
+        .route("/api/v1/cloud/:target/ws", get(cloud::ws))
 }
 
 /// 从 `Authorization: Bearer xxx` 或 `X-SpeakLab-Token` 里取出令牌。

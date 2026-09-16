@@ -11,6 +11,7 @@
 //! `domain` 里，外部依赖放在 `infra` 里，方便替换和单测。
 
 mod asr;
+mod cloud;
 mod config;
 mod domain;
 mod error;
@@ -43,12 +44,13 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
         asr = config.asr.describe(),
+        cloud = config.cloud.describe(),
         db = %config.db_path.display(),
         "SpeakLab 后端启动"
     );
 
     let state = AppState::new(config.clone(), store).await?;
-    let app = build_router(state, &config);
+    let app = build_router(state.clone(), &config);
 
     let addr: SocketAddr = config.bind.parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -57,6 +59,11 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+
+    // 必须显式收掉云游戏的浏览器进程。它们是我们 spawn 出来的，
+    // 主进程退出不会自动带走——留着就是一堆看不到的 Edge 在后台
+    // 吃内存，而且还占着调试端口。
+    state.cloud().close_all().await;
 
     tracing::info!("已停止");
     Ok(())

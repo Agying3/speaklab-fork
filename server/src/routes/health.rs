@@ -47,6 +47,9 @@ pub struct Capabilities {
     pub storage: bool,
     /// 已存的记录条数，前端可以拿来提示「云端有 N 条」。
     pub stored_records: u64,
+    /// 云游戏串流是否可用。前端据此决定首页那张卡片是
+    /// 「点进去玩」还是「点击跳转官网」。
+    pub cloud_games: bool,
     /// 识别支持的语言列表。
     pub asr_languages: Vec<&'static str>,
 }
@@ -74,6 +77,7 @@ pub async fn meta(State(state): State<AppState>) -> Json<Meta> {
             auth_required: cfg.api_token.is_some(),
             storage: true,
             stored_records,
+            cloud_games: cfg.cloud.enabled(),
             asr_languages: languages,
         },
     })

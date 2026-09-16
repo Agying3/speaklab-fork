@@ -1,4 +1,4 @@
-﻿# Rust 构建产物
+# Rust 构建产物
 /target
 
 # whisper 模型文件，几百 MB，不入库
@@ -7,3 +7,13 @@
 # 本地环境变量
 .env
 .env.local
+
+# SQLite 数据库。里面是练习记录，属于用户数据，不该入库。
+# -wal / -shm 是 SQLite 的运行时辅助文件，会跟着主库一起出现。
+*.db
+*.db-wal
+*.db-shm
+
+# 云游戏的浏览器配置目录。**这个必须忽略**：里面存着登录 cookie，
+# 提交上去等于把账号凭证发到仓库里。
+cloud-profiles/

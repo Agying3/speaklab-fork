@@ -21,17 +21,29 @@ struct Inner {
     asr_gate: Semaphore,
     started_at: std::time::Instant,
     store: crate::store::Store,
+    cloud: crate::cloud::CloudService,
 }
 
 impl AppState {
     pub async fn new(config: Config, store: crate::store::Store) -> anyhow::Result<Self> {
         let permits = config.asr.max_concurrency.max(1);
+
+        let cloud = crate::cloud::CloudService::new(
+            config.cloud.browser_exe.clone(),
+            config.cloud.profile_root.clone(),
+            config.cloud.port_base,
+            config.cloud.quality,
+            config.cloud.max_width,
+            config.cloud.max_height,
+        );
+
         Ok(Self {
             inner: Arc::new(Inner {
                 config,
                 asr_gate: Semaphore::new(permits),
                 started_at: std::time::Instant::now(),
                 store,
+                cloud,
             }),
         })
     }
@@ -42,6 +54,10 @@ impl AppState {
 
     pub fn store(&self) -> &crate::store::Store {
         &self.inner.store
+    }
+
+    pub fn cloud(&self) -> &crate::cloud::CloudService {
+        &self.inner.cloud
     }
 
     pub fn asr_gate(&self) -> &Semaphore {

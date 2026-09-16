@@ -25,6 +25,44 @@ pub struct Config {
     pub api_token: Option<String>,
     /// SQLite 数据库文件路径。
     pub db_path: std::path::PathBuf,
+    /// 云游戏串流相关配置。
+    pub cloud: CloudConfig,
+}
+
+#[derive(Debug, Clone)]
+pub struct CloudConfig {
+    /// 浏览器可执行文件。None 表示没找到，云游戏接口返回 501。
+    pub browser_exe: Option<std::path::PathBuf>,
+    /// 浏览器临时配置目录的父目录。
+    pub profile_root: std::path::PathBuf,
+    /// 调试端口起始值。每个会话往后一个。
+    pub port_base: u16,
+    /// JPEG 质量。云游戏 60 左右肉眼无差，再高只是白费带宽。
+    pub quality: u8,
+    /// 画面宽高。这是卡片里那块地方的实际像素尺寸。
+    pub max_width: u32,
+    pub max_height: u32,
+}
+
+impl CloudConfig {
+    /// 给启动日志用。
+    pub fn describe(&self) -> String {
+        match &self.browser_exe {
+            Some(p) => format!(
+                "已启用（{}，{}x{}）",
+                p.file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                self.max_width,
+                self.max_height
+            ),
+            None => "未启用（没找到 Edge 或 Chrome）".into(),
+        }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.browser_exe.is_some()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +151,23 @@ impl Config {
                 .filter(|s| !s.trim().is_empty())
                 .map(std::path::PathBuf::from)
                 .unwrap_or_else(|| std::path::PathBuf::from("speaklab.db")),
+            cloud: CloudConfig {
+                // 允许用 SPEAKLAB_BROWSER 指定，否则自动找
+                browser_exe: env::var("SPEAKLAB_BROWSER")
+                    .ok()
+                    .filter(|s| !s.trim().is_empty())
+                    .map(std::path::PathBuf::from)
+                    .or_else(crate::cloud::browser::find_browser),
+                profile_root: env::var("SPEAKLAB_CLOUD_PROFILE")
+                    .ok()
+                    .filter(|s| !s.trim().is_empty())
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|| std::env::temp_dir().join("speaklab-cloud")),
+                port_base: env_usize("SPEAKLAB_CLOUD_PORT", 9222).clamp(1024, 65000) as u16,
+                quality: env_usize("SPEAKLAB_CLOUD_QUALITY", 60).clamp(10, 100) as u8,
+                max_width: env_usize("SPEAKLAB_CLOUD_WIDTH", 480).clamp(160, 1920) as u32,
+                max_height: env_usize("SPEAKLAB_CLOUD_HEIGHT", 320).clamp(120, 1080) as u32,
+            },
         })
     }
 
