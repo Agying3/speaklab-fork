@@ -6,7 +6,7 @@
 pub mod health;
 pub mod practices;
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 
 use crate::state::AppState;
@@ -20,6 +20,7 @@ pub fn router() -> Router<AppState> {
             post(practices::create).get(practices::list),
         )
         .route("/api/v1/practices/stats", get(practices::stats))
+        .route("/api/v1/practices/:id", delete(practices::delete))
         .route("/api/v1/asr", post(practices::transcribe))
 }
 

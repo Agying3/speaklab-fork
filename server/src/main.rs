@@ -16,6 +16,7 @@ mod domain;
 mod error;
 mod routes;
 mod state;
+mod store;
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -36,13 +37,17 @@ async fn main() -> anyhow::Result<()> {
     init_tracing();
 
     let config = Config::from_env()?;
+
+    let store = crate::store::Store::open(&config.db_path).await?;
+
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
         asr = config.asr.describe(),
+        db = %config.db_path.display(),
         "SpeakLab 后端启动"
     );
 
-    let state = AppState::new(config.clone()).await?;
+    let state = AppState::new(config.clone(), store).await?;
     let app = build_router(state, &config);
 
     let addr: SocketAddr = config.bind.parse()?;

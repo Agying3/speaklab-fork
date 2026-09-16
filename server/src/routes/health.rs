@@ -43,6 +43,10 @@ pub struct Capabilities {
     pub llm_proxy: bool,
     /// 是否要求令牌。
     pub auth_required: bool,
+    /// 练习记录是否持久化。
+    pub storage: bool,
+    /// 已存的记录条数，前端可以拿来提示「云端有 N 条」。
+    pub stored_records: u64,
     /// 识别支持的语言列表。
     pub asr_languages: Vec<&'static str>,
 }
@@ -56,6 +60,10 @@ pub async fn meta(State(state): State<AppState>) -> Json<Meta> {
         languages.retain(|l| *l != "auto");
     }
 
+    // 数不出来也不该让整个 meta 挂掉，退回 0 就行。
+    // 前端拿这个数字只是为了显示，不值得让接口整体失败。
+    let stored_records = state.store().count().await.unwrap_or(0);
+
     Json(Meta {
         name: "speaklab-server",
         version: env!("CARGO_PKG_VERSION"),
@@ -64,6 +72,8 @@ pub async fn meta(State(state): State<AppState>) -> Json<Meta> {
             asr_local: cfg.asr.enabled(),
             llm_proxy: cfg.llm.is_some(),
             auth_required: cfg.api_token.is_some(),
+            storage: true,
+            stored_records,
             asr_languages: languages,
         },
     })

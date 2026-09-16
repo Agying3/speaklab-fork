@@ -5,7 +5,7 @@ use axum::http::HeaderMap;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{PracticeRecord, Stats};
+use crate::domain::{PracticeKind, PracticeRecord, Stats};
 use crate::error::{AppError, AppResult};
 use crate::routes::bearer_token;
 use crate::state::AppState;
@@ -20,8 +20,11 @@ pub struct CreateRequest {
 
 #[derive(Serialize)]
 pub struct CreateResponse {
+    /// 实际新写入的条数。
     pub accepted: usize,
-    /// 被拒的条目及原因。不用整体失败，一条坏数据不该毁掉整批同步。
+    /// 因为 id 已存在而跳过的条数。客户端重试会走到这里，
+    /// 不是错误，所以单独报出来而不是混进 rejected。
+    pub duplicates: usize,
     pub rejected: Vec<Rejection>,
 }
 
@@ -50,12 +53,14 @@ pub async fn create(
         )));
     }
 
-    let mut accepted = 0usize;
+    // 先逐条校验。一条坏数据不该毁掉整批同步——客户端可以
+    // 只重推被拒的那几条，所以这里分出「收下」和「退回」两堆。
+    let mut valid = Vec::new();
     let mut rejected = Vec::new();
 
-    for r in &req.records {
+    for r in req.records {
         match r.validate() {
-            Ok(()) => accepted += 1,
+            Ok(()) => valid.push(r),
             Err(reason) => rejected.push(Rejection {
                 id: r.id.clone(),
                 reason,
@@ -63,9 +68,18 @@ pub async fn create(
         }
     }
 
-    tracing::info!(accepted, rejected = rejected.len(), "收到练习记录");
+    let submitted = valid.len();
+    let stored = state.store().insert_many(valid).await?;
+    // 写进去的比提交的少，说明有 id 重复。
+    let duplicates = submitted - stored;
 
-    Ok(Json(CreateResponse { accepted, rejected }))
+    tracing::info!(stored, duplicates, rejected = rejected.len(), "写入练习记录");
+
+    Ok(Json(CreateResponse {
+        accepted: stored,
+        duplicates,
+        rejected,
+    }))
 }
 
 // ---------------------------------------------------------------- 读取
@@ -81,7 +95,10 @@ pub struct ListQuery {
 #[derive(Serialize)]
 pub struct ListResponse {
     pub records: Vec<PracticeRecord>,
+    /// 本页条数。
     pub total: usize,
+    /// 库里符合条件的总条数，用来判断还有没有下一页。
+    pub grand_total: u64,
 }
 
 pub async fn list(
@@ -93,13 +110,26 @@ pub async fn list(
 
     let limit = q.limit.unwrap_or(50).min(500);
 
-    // TODO 接上真正的存储。现在返回空列表而不是报错，
-    //      这样前端可以先按最终形状对接，不必等后端做完。
-    let records: Vec<PracticeRecord> = Vec::new();
-    let _ = (&q.kind, limit);
+    // 类型写错时直接报错，而不是静默返回空列表——
+    // 前端拼错了参数应该马上发现，而不是以为「今天没练过」。
+    let kind = match q.kind.as_deref() {
+        None => None,
+        Some("shadow") => Some(PracticeKind::Shadow),
+        Some("chat") => Some(PracticeKind::Chat),
+        Some("phoneme") => Some(PracticeKind::Phoneme),
+        Some(other) => {
+            return Err(AppError::BadRequest(format!(
+                "kind 只能是 shadow/chat/phoneme，收到 {other:?}"
+            )))
+        }
+    };
+
+    let records = state.store().list(kind, limit).await?;
+    let grand_total = state.store().count().await?;
 
     Ok(Json(ListResponse {
         total: records.len(),
+        grand_total,
         records,
     }))
 }
@@ -109,7 +139,23 @@ pub async fn stats(
     headers: HeaderMap,
 ) -> AppResult<Json<Stats>> {
     state.authorize(bearer_token(&headers).as_deref())?;
-    Ok(Json(Stats::default()))
+    Ok(Json(state.store().stats().await?))
+}
+
+/// 删除一条记录。
+pub async fn delete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> AppResult<axum::http::StatusCode> {
+    state.authorize(bearer_token(&headers).as_deref())?;
+
+    if state.store().delete(id.clone()).await? {
+        tracing::info!(id, "删除记录");
+        Ok(axum::http::StatusCode::NO_CONTENT)
+    } else {
+        Err(AppError::NotFound(format!("记录 {id}")))
+    }
 }
 
 // ---------------------------------------------------------------- 语音识别
@@ -187,9 +233,14 @@ pub async fn transcribe(
     let result = crate::asr::transcribe(&state, &audio, &lang).await;
 
     #[cfg(not(feature = "whisper"))]
-    let result: AppResult<crate::asr::Transcript> = Err(AppError::NotImplemented(
-        "本地语音识别（编译时未打开 whisper feature）".into(),
-    ));
+    let result: AppResult<crate::asr::Transcript> = {
+        // 走不到这里：上面 enabled() 已经挡掉了没开 feature 的情况。
+        // 留着是为了让两种编译配置下的类型保持一致。
+        let _ = &lang;
+        Err(AppError::NotImplemented(
+            "本地语音识别（编译时未打开 whisper feature）".into(),
+        ))
+    };
 
     let transcript = result?;
 

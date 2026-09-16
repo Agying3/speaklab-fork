@@ -23,6 +23,8 @@ pub struct Config {
     pub llm: Option<LlmConfig>,
     /// 会话密钥。未设置时服务拒绝写入型接口，避免"看起来能用其实没保护"。
     pub api_token: Option<String>,
+    /// SQLite 数据库文件路径。
+    pub db_path: std::path::PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +108,11 @@ impl Config {
             },
             llm,
             api_token,
+            db_path: env::var("SPEAKLAB_DB")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| std::path::PathBuf::from("speaklab.db")),
         })
     }
 

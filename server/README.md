@@ -51,6 +51,10 @@ cargo run
 **逐字正确**。耗时约 6.3 秒识别 4.85 秒音频，tiny 模型在 CPU 上
 差不多就是这个速度；换 `base.en` 会更准也更慢。
 
+存储也实测过一轮：写 3 条 → 重启服务 → 3 条还在 → 按类型过滤
+（shadow 2 条 / chat 1 条）→ 统计出 3 天均值 0.8167 → 删除后
+重算为 2 条均值 0.875 → 再删返回 404。
+
 产物 3.91 MB，加上三个 DLL 共约 6.5 MB。
 
 ### 验证
@@ -68,8 +72,9 @@ curl http://127.0.0.1:8787/api/v1/meta
 |---|---|---|
 | GET | `/health` | 存活与运行时长 |
 | GET | `/meta` | 能力清单，前端据此决定按钮显不显示 |
-| GET | `/practices` | 练习记录列表 |
+| GET | `/practices` | 练习记录列表，支持 `?kind=` 和 `?limit=` |
 | POST | `/practices` | 批量写入记录 |
+| DELETE | `/practices/:id` | 删除一条 |
 | GET | `/practices/stats` | 汇总统计 |
 | POST | `/asr` | 音频转写（multipart） |
 
@@ -84,13 +89,16 @@ curl http://127.0.0.1:8787/api/v1/meta
     "asr_local": false,
     "llm_proxy": false,
     "auth_required": false,
+    "storage": true,
+    "stored_records": 0,
     "asr_languages": ["en", "zh", "ja", "ko"]
   }
 }
 ```
 
 `asr_local` 为 `false` 时前端就不该显示「服务端识别」这个选项，
-而不是先调用再处理 501。
+而不是先调用再处理 501。`stored_records` 可以让前端提示
+「云端有 N 条记录」。
 
 ### `POST /practices`
 
@@ -115,6 +123,7 @@ curl http://127.0.0.1:8787/api/v1/meta
 ```json
 {
   "accepted": 1,
+  "duplicates": 0,
   "rejected": [
     { "id": "bad", "reason": "total 应在 0..=1 之间，实际 1.7" }
   ]
@@ -122,6 +131,49 @@ curl http://127.0.0.1:8787/api/v1/meta
 ```
 
 一条坏数据不该毁掉整批同步——客户端可以只重推被拒的那几条。
+
+`duplicates` 是 id 已存在而跳过的条数。写入用 `INSERT OR IGNORE`，
+所以**重试是幂等的**：同一批推两次，第二次 `accepted` 为 0、
+`duplicates` 等于条数，数据不会翻倍。客户端断线重连时可以放心重推。
+
+### 存储
+
+SQLite，默认落在**工作目录下的 `speaklab.db`**，用 `SPEAKLAB_DB` 改路径。
+
+选它是因为这个服务基本都自部署：一个文件就是全部状态，备份等于拷文件，
+不用另起数据库进程。`rusqlite` 开了 `bundled`，SQLite 源码一起编进产物，
+**不依赖系统里的 sqlite3.dll**。
+
+开了 WAL 模式（`journal_mode=WAL`），读写不互相阻塞。所以你会看到三个文件：
+
+```
+speaklab.db         主库
+speaklab.db-wal     预写日志
+speaklab.db-shm     共享内存索引
+```
+
+**备份时三个都要拷**，或者先停服务再拷 `.db`。
+
+表结构：
+
+```sql
+CREATE TABLE practices (
+    id           TEXT PRIMARY KEY,
+    kind         TEXT NOT NULL,
+    target       TEXT NOT NULL DEFAULT '',
+    transcript   TEXT NOT NULL DEFAULT '',
+    total        REAL NOT NULL,
+    accuracy     REAL NOT NULL DEFAULT 0,
+    fluency      REAL NOT NULL DEFAULT 0,
+    completeness REAL NOT NULL DEFAULT 0,
+    label        TEXT NOT NULL DEFAULT '',
+    at           TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+`at` 由客户端提供而不是服务端生成——补推离线期间攒的记录时，
+练习发生的时间才是对的，不是上传的时间。
 
 ### `POST /asr`
 
@@ -169,6 +221,7 @@ message 是给人看的，会变。
 | `SPEAKLAB_ALLOWED_ORIGINS` | 空 | 生产环境允许的来源，逗号分隔 |
 | `SPEAKLAB_TOKEN` | 空 | API 令牌；空则不校验 |
 | `SPEAKLAB_MAX_BODY_BYTES` | 8 MiB | 单请求体积上限 |
+| `SPEAKLAB_DB` | `speaklab.db` | SQLite 文件路径 |
 | `SPEAKLAB_ASR_MODEL` | 空 | whisper 模型路径，空则识别不可用 |
 | `SPEAKLAB_ASR_LANG` | `en` | 默认识别语言 |
 | `SPEAKLAB_ASR_CONCURRENCY` | CPU 核数一半 | 并发推理上限 |
@@ -280,12 +333,15 @@ cargo:rustc-link-lib=dylib=stdc++     注意是 dylib
 ```
 server/
 ├── Cargo.toml
+├── scripts/
+│   └── build.ps1        编译 + 补齐运行库
 └── src/
     ├── main.rs          启动、路由组装、优雅退出
     ├── config.rs        环境变量 → 配置
     ├── state.rs         共享状态、令牌校验
     ├── error.rs         统一错误与状态码映射
     ├── domain.rs        领域模型与规则（无外部依赖，可单测）
+    ├── store.rs         SQLite 持久化
     ├── asr.rs           本地语音识别（feature 门控）
     └── routes/
         ├── mod.rs       路由表

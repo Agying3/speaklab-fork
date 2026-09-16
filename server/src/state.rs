@@ -20,22 +20,28 @@ struct Inner {
     /// 放任并发只会让所有请求一起变慢。
     asr_gate: Semaphore,
     started_at: std::time::Instant,
+    store: crate::store::Store,
 }
 
 impl AppState {
-    pub async fn new(config: Config) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, store: crate::store::Store) -> anyhow::Result<Self> {
         let permits = config.asr.max_concurrency.max(1);
         Ok(Self {
             inner: Arc::new(Inner {
                 config,
                 asr_gate: Semaphore::new(permits),
                 started_at: std::time::Instant::now(),
+                store,
             }),
         })
     }
 
     pub fn config(&self) -> &Config {
         &self.inner.config
+    }
+
+    pub fn store(&self) -> &crate::store::Store {
+        &self.inner.store
     }
 
     pub fn asr_gate(&self) -> &Semaphore {

@@ -27,8 +27,13 @@ thiserror = "1"
 anyhow = "1"
 
 # 其他
-uuid = { version = "1", features = ["v4", "serde"] }
-time = { version = "0.3", features = ["serde", "formatting", "macros"] }
+tokio-rusqlite = "0.5"
+
+[dependencies.rusqlite]
+version = "0.31"
+# bundled 会把 SQLite 源码一起编进来，产出一个不依赖系统
+# sqlite3.dll 的可执行文件。自部署场景下这比省几 MB 重要得多。
+features = ["bundled"]
 
 [features]
 default = []
