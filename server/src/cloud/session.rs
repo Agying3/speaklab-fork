@@ -353,6 +353,21 @@ impl Session {
                         Some(&new_sid),
                     )
                     .await;
+                // 视口也要重设。不设的话被跟过来的标签页会用它自己的
+                // 窗口尺寸渲染，出来的帧跟原来的 480x320 不一样大——
+                // 前端卡片按 ready 里的尺寸定了比例，换尺寸后画面会
+                // 忽大忽小，点击坐标也跟着偏。实测漏了这一步时，
+                // 跟到 user.mihoyo.com 之后帧变成了 492x228。
+                let _ = cdp_tabs
+                    .call_on(
+                        "Emulation.setDeviceMetricsOverride",
+                        json!({
+                            "width": max_width, "height": max_height,
+                            "deviceScaleFactor": 1.0, "mobile": true,
+                        }),
+                        Some(&new_sid),
+                    )
+                    .await;
 
                 // 记下来。自愈循环下一轮就会盯上这个新页面。
                 if let Ok(mut w) = current_sid_writer.write() {
@@ -381,6 +396,8 @@ impl Session {
         let alive_sc = Arc::clone(&alive);
         let counter_sc = Arc::clone(&frames_sent);
         let sid_sc = Arc::clone(&current_sid);
+        // 自愈循环里主动抓的兜底帧也从同一个通道发出去
+        let tx_fallback = tx.clone();
         tokio::spawn(async move {
             let q = quality;
             let (mw, mh) = (max_width, max_height);
@@ -408,15 +425,28 @@ impl Session {
                 tracing::warn!(error = %e, "首次开帧流失败");
             }
 
-            // 每 2 秒检查一次：连续两轮没有新帧就重开。
+            // 每 2 秒检查一次，连续几轮没有新帧就主动抓一张。
             //
-            // "一段时间没帧"不能直接等同于坏了——真正静止的页面确实
-            // 可能几秒没有新帧（screencast 只在重绘时出帧）。但如果
-            // 一直没帧又一直不重开，导航造成的失效就会变成永久黑屏。
-            // 重开一次在页面静止时是空操作，代价可以接受。
+            // 这里有个容易搞错的地方：**没帧不等于坏了**。
+            // screencast 是「有重绘才出帧」的，一个静止的页面（比如
+            // 停在登录页没人操作）本来就不会产生任何帧。实测就是这样：
+            // 页面加载时 8 秒出 118 帧，之后 8 秒只出 1 帧，动一下鼠标
+            // 才又出 1 帧。
+            //
+            // 所以静态页面上「重开 screencast」是纯空转——试过，每 6 秒
+            // 重开一次，帧数一点也不涨，只是在反复折腾 CDP 连接。
+            //
+            // 真正需要兜底的是另一种情况：页面变了但 CDP 没发帧过来
+            // （导航到新文档时容易发生）。这时用 Page.captureScreenshot
+            // 主动拉一张，比重开 screencast 更直接，也不会打断正常出帧。
             let mut last_seen = counter_sc.load(Ordering::Relaxed);
             let mut idle_ticks = 0u32;
             let mut last_sid = read_sid(&sid_sc);
+            // 主动抓帧要限流：抓到的新帧会让 idle_ticks 归零，
+            // 但万一是同一个静止画面，下一轮又会抓，形成每 2 秒一张的
+            // 心跳流量。静态页面上这纯属浪费（画面没变，前端也不需要
+            // 重发），所以两次主动抓帧之间至少隔这么久。
+            let mut last_grab = std::time::Instant::now();
 
             while alive_sc.load(Ordering::Relaxed) {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -454,19 +484,52 @@ impl Session {
                 }
 
                 idle_ticks += 1;
-                if idle_ticks < 2 {
+                if idle_ticks < 3 {
                     continue;
                 }
 
-                tracing::debug!("帧流静止超过 4 秒，重开 screencast");
-                // 先停再开：直接重开可能返回 "Screencast is already active"，
-                // 而那个状态下其实是不出帧的。
-                let _ = cdp_sc
-                    .call_on("Page.stopScreencast", json!({}), Some(&cur_sid))
-                    .await;
-                match start(cdp_sc.clone(), cur_sid).await {
-                    Ok(_) => tracing::debug!("帧流已重开"),
-                    Err(e) => tracing::debug!(error = %e, "重开帧流失败，下次再试"),
+                // 页面静止。别去重开 screencast（那样只会空转），
+                // 直接抓一张当前画面。抓到就说明页面确实在、能出图，
+                // 前端至少不会永远停在旧帧上。
+                if last_grab.elapsed() < std::time::Duration::from_secs(10) {
+                    idle_ticks = 0;
+                    continue;
+                }
+                last_grab = std::time::Instant::now();
+
+                match cdp_sc
+                    .call_on(
+                        "Page.captureScreenshot",
+                        json!({ "format": "jpeg", "quality": q }),
+                        Some(&cur_sid),
+                    )
+                    .await
+                {
+                    Ok(res) => {
+                        let data = res
+                            .get("data")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_owned();
+                        if !data.is_empty() {
+                            // 这张图可能会让前端重画一次，
+                            // 但画面本来就是静止的，等于空操作。
+                            counter_sc.fetch_add(1, Ordering::Relaxed);
+                            let _ = tx_fallback.send(Outgoing::Frame(Frame {
+                                data,
+                                ts: 0.0,
+                                width: 0,
+                                height: 0,
+                            }));
+                            tracing::debug!("页面静止，主动抓了一张兜底帧");
+                        }
+                    }
+                    Err(e) => {
+                        // 抓不到通常意味着页面真的没了（标签页被关、
+                        // 进程挂了）。这时重开 screencast 也没用，
+                        // 记一行日志，等下一轮再看。
+                        tracing::debug!(error = %e, "兜底抓帧失败");
+                    }
                 }
                 idle_ticks = 0;
             }

@@ -705,6 +705,8 @@ main{position:relative;z-index:1}
 </style>
 <!-- 小恐龙卡片（T-Rex Runner）的样式，BSD-3-Clause，见 dino/README.md -->
 <link rel="stylesheet" href="dino/dino.css">
+<!-- 云游戏卡片。后端 server/src/cloud/ 的配套前端，见 cloud/cloud.js -->
+<link rel="stylesheet" href="cloud/cloud.css">
 </head>
 <body>
 <header class="topbar">
@@ -766,15 +768,18 @@ main{position:relative;z-index:1}
       </button>
       <div class="entry" id="dinoCard" role="button" tabindex="0"
            aria-label="小恐龙：点击后用空格或方向键操作">
-        <div class="dino-hint">
-          <b>点我接手</b>
-          <i>空格 / ↑ 跳，↓ 蹲</i>
-        </div>
         <div class="dino-stage">
           <!-- 上游 init() 无条件 querySelector 这两个元素，缺了会抛 TypeError -->
           <div class="icon icon-offline" aria-hidden="true"></div>
           <div class="interstitial-wrapper"></div>
         </div>
+      </div>
+      <!-- 云游戏卡片。后端没有 cloud_games 能力时 CloudCard.init() 会把它藏起来。
+           卡片上不放任何文字标签，提示只在连接状态变化时临时出现。 -->
+      <div class="entry" id="cloudCard" role="button" tabindex="0"
+           aria-label="云游戏：点一下在卡片里玩" hidden>
+        <img class="cloud-screen" alt="" aria-hidden="true">
+        <div class="cloud-status" role="status" aria-live="polite"></div>
       </div>
     </div>
 
@@ -1086,6 +1091,8 @@ main{position:relative;z-index:1}
 <!-- 小恐龙卡片（T-Rex Runner）。必须在下面的主脚本之前加载：
      init() 会同步调用 DinoCard.init()。BSD-3-Clause，见 dino/README.md -->
 <script src="dino/dino.js"></script>
+<!-- 云游戏卡片。同样要在主脚本之前加载：init() 里会调 CloudCard.init() -->
+<script src="cloud/cloud.js"></script>
 <script>
 'use strict';
 /* ============================================================
@@ -3974,6 +3981,9 @@ init();
    探测到就记下来，各模块按需取用；没探测到就什么都不发生。 */
 Backend.probe().then(ok => {
   if(ok) console.info('[backend] 已连接 ' + Backend.base, Backend.caps);
+  /* 云游戏卡片要等探测结果出来才知道后端在不在、有没有这能力，
+     所以放在这里而不是 init() 里。没后端时 init() 会把卡片藏起来。 */
+  try{ if(typeof CloudCard!=='undefined') CloudCard.init(); }catch(e){ console.warn('[cloud] 初始化失败', e); }
 });
 </script>
 <!-- T-Rex runner assets. BSD-3-Clause, from wayou/t-rex-runner (see dino/LICENSE). -->

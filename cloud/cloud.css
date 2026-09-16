@@ -1,0 +1,70 @@
+/* ============================================================
+   云游戏卡片 — 样式
+   ------------------------------------------------------------
+   和后端 server/src/cloud/ 配套。画面是后端用无头浏览器
+   跑出来的 JPEG 帧，通过 WebSocket 推过来，这里只负责显示
+   和把鼠标/触摸/键盘事件发回去。
+
+   整张卡片不放任何文字（跟小恐龙卡片一个规矩）。
+   ============================================================ */
+
+/* 卡片本体：跟 .entry 同尺寸，不因为塞了游戏而变大 */
+#cloudCard{
+  position:relative;
+  overflow:hidden;
+  padding:0;                  /* 画面顶满，连内边距都不要 */
+  cursor:pointer;
+  display:block;
+  background:#0d1117;         /* 画面没到之前先给个底色，避免白闪 */
+  min-height:150px;
+}
+
+/* 画面。后端给的是 480x320，用 object-fit 保证不变形：
+   卡片比例跟 3:2 不一致时，宁可留黑边也不要拉伸，
+   否则云原神里的按钮位置会跟实际点击坐标对不上。 */
+#cloudCard .cloud-screen{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+  pointer-events:none;        /* 事件统一挂卡片上，这里不抢 */
+}
+
+/* 连接中 / 出错时的提示。平时隐藏。 */
+#cloudCard .cloud-status{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  padding:6px 10px;
+  font-size:12px;
+  line-height:1.35;
+  color:#c9d1d9;
+  background:linear-gradient(transparent, rgba(13,17,23,.85));
+  opacity:0;
+  transition:opacity .25s ease;
+  pointer-events:none;
+  text-align:center;
+}
+#cloudCard.cloud-msg .cloud-status{opacity:1}
+
+/* 会话活着的时候别显示任何覆盖层 */
+#cloudCard.cloud-live .cloud-status{opacity:0}
+
+/* 键盘焦点要看得见——不然没法用键盘操作 */
+#cloudCard:focus-visible{
+  outline:2px solid var(--green-2, #4ade80);
+  outline-offset:2px;
+}
+
+/* 悬停反馈 */
+#cloudCard:hover{border-color:var(--green-2)}
+
+/* 窄屏时矮一点，别把首页顶太长 */
+@media (max-width:720px){
+  #cloudCard{min-height:120px}
+}
+
+/* 尊重"减少动效"偏好：状态提示不做淡入淡出 */
+@media (prefers-reduced-motion:reduce){
+  #cloudCard .cloud-status{transition:none}
+}
