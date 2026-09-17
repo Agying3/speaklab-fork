@@ -41,10 +41,14 @@
   transform:none !important;
   overflow:hidden;
 }
+/* left/top 由 fit() 写入（画面在卡片里居中）。
+   这里不写 bottom —— 同时写 top 和 bottom 会让绝对定位元素被拉伸，
+   跟 fit() 写进去的显式高度打架。
+   fit() 跑之前 top 是 auto，画面停在容器顶部，一瞬间的事。 */
 #dinoCard .runner-canvas{
   display:block;
   position:absolute;
-  left:0; bottom:0;
+  left:0;
   image-rendering:pixelated;
 }
 

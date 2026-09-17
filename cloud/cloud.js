@@ -40,11 +40,15 @@ const CloudCard = (() => {
   /* 页面上有几张卡，以及每张卡对应后端哪个 target。
      顺序就是它们在各自主容器里的排列顺序。
      加新卡片：这里加一项 + index.html 里加一个对应的卡片 div
-     （class 带 cloud-poster / cloud-screen / cloud-play / cloud-status）。 */
+     （class 带 cloud-poster / cloud-screen / cloud-play / cloud-status）。
+
+     wide = 横卡（跨两列，画面铺满整张卡）。
+     没标的（云·鸣潮）是竖卡：只占一列，高度由同行的横卡拉平，
+     画面横着居中显示，上下露出海报。两者的差别见下面 ready 那里。 */
   const CARDS = [
-    { el: 'cloudCard',      target: 'genshin'   },
-    { el: 'cloudCardStar',  target: 'starrail'  },
-    { el: 'cloudCardMC',    target: 'mingchao'  },
+    { el: 'cloudCard',      target: 'genshin',   wide: true },
+    { el: 'cloudCardStar',  target: 'starrail',  wide: true },
+    { el: 'cloudCardMC',    target: 'mingchao'             },
   ];
 
   /* ---------------- 单个卡片的实例状态 ----------------
@@ -167,7 +171,17 @@ const CloudCard = (() => {
           if(m.width && m.height){
             card.frameW = m.width;
             card.frameH = m.height;
-            card.el.style.aspectRatio = `${m.width} / ${m.height}`;
+
+            // 只有横卡才把画面比例写到卡片上。
+            //
+            // 竖卡（云·鸣潮）写上去会炸：竖卡靠 align-self:stretch 从
+            // 同行那张跨两列的横卡拿到确定的高度（405px），这时候再给
+            // 一个 3:2 的 aspect-ratio，浏览器会反过来「由高度算宽度」
+            // ——405 * 1.5 = 608px，直接撑破 296px 那一列，卡片横着
+            // 压到邻居身上（实测过）。
+            //
+            // 竖卡不写就没事：没有比例，高度就完全听 stretch 的。
+            if(card.wide) card.el.style.aspectRatio = `${m.width} / ${m.height}`;
           }
           break;
         case 'frame':
@@ -220,9 +234,24 @@ const CloudCard = (() => {
        而且不断开连接，表现就是"点了没反应"。 */
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      el.focus();
-      try { el.setPointerCapture(e.pointerId); } catch(err){}
+
+      /* 顺序很重要：**先算坐标，再 focus()**。
+         ------------------------------------------------------------
+         focus() 默认会把元素滚进视野。首页上云游戏卡排在最下面
+         （实测卡顶在 y=1036，视口只有 808 高），一 focus 页面就滚了
+         834px。而 norm() 是拿 getBoundingClientRect() 算的——它读到
+         的是**滚动之后**的位置，e.clientY 却还是滚动之前的值，两者
+         差了一整页，换算出来的 y 永远是 1.0（点到最底下）。
+
+         表现就是：折叠线以下的卡片，第一次点击怎么点都不中。
+         在视野内点没事，所以很容易漏掉。
+
+         preventScroll 是第二层保险——就算以后有人把 focus 挪回前面，
+         页面也不会滚。老浏览器不认这个参数，所以兜一层。 */
       const p = norm(card, e);
+      try { el.focus({ preventScroll: true }); } catch(err){ try { el.focus(); } catch(e2){} }
+      try { el.setPointerCapture(e.pointerId); } catch(err){}
+
       send(card, { type:'mouse', kind:'down', x:p.x, y:p.y, button:'left' });
     });
 
@@ -399,6 +428,11 @@ const CloudCard = (() => {
         wsUrl: card.wsUrl,
         readyState: card.ws ? card.ws.readyState : -1,
         sinceFrame: card.lastFrameAt ? Math.round(performance.now() - card.lastFrameAt) : -1,
+        // 远端画面尺寸。点击坐标就是按它换算的，对不上时先看这两个数
+        // 跟卡片实际比例差多少（见 norm）。
+        frame: card.frameW ? `${card.frameW}x${card.frameH}` : '(还没收到)',
+        wide: !!card.wide,
+        sleeping: !!card.sleeping,
       };
     },
     /* 列出所有卡片，测试用 */

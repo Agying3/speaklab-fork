@@ -3050,12 +3050,18 @@ const DinoCard = {
 
       // 用 transform 缩放整幅画面：不动 canvas 的 width/height 属性，
       // 也就不会和上游的 updateCanvasScaling 互相覆盖。
+      //
+      // transform-origin 用 left top（不是 left bottom）：卡片现在是竖的
+      // （跟同行的云游戏卡一样高，405px），而游戏只有 74px 高，缩放后
+      // 需要垂直居中。origin 在 top 时，画面的上边正好落在写入的 top 上，
+      // 用 (sh - shownH) / 2 就能算准；origin 在 bottom 的话算出来会偏。
       r.canvas.style.width  = inW + 'px';
       r.canvas.style.height = inH + 'px';
-      r.canvas.style.transformOrigin = 'left bottom';
+      r.canvas.style.transformOrigin = 'left top';
       r.canvas.style.transform = 'scale(' + scale + ')';
-      // 画面比容器窄时居中
+      // 画面比容器窄/矮时居中（两边都留白，不然贴在顶边很难看）
       r.canvas.style.left = Math.round((sw - shownW) / 2) + 'px';
+      r.canvas.style.top  = Math.round((sh - shownH) / 2) + 'px';
 
       if(r.containerEl){
         r.containerEl.style.width  = sw + 'px';
