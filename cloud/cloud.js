@@ -42,6 +42,7 @@ const CloudCard = (() => {
   let reconnectCount = 0;
   let pressedKeys = new Set();     // 按下的键，避免 keydown 重复触发
   let lastTouchId = 0;
+  let sleeping = false;            // 页面是不是切到后台了（后端那边已休眠）
 
   /* ---------------- 小工具 ---------------- */
 
@@ -133,6 +134,10 @@ const CloudCard = (() => {
     ws.onclose = () => {
       el.classList.remove('cloud-live');
       if(!alive) return;                 // 用户主动关的，不重连
+      // 休眠期间后端可能因为超时把关掉了会话，这条连接就是被它关的。
+      // 这时候不要立刻重连——重连等于又起一个浏览器，而用户还在后台，
+      // 白白占 700 MB。等他切回来的时候 visibilitychange 会处理。
+      if(sleeping) return;
       if(reconnectCount >= MAX_RECONNECT){
         setStatus('连不上后端，点一下重试');
         return;
@@ -291,11 +296,35 @@ const CloudCard = (() => {
 
       bindInput();
 
-      // 页面切到后台就断开，省掉一个一直跑的浏览器进程。
-      // 切回来不自动重连——用户可能只是去别的标签页拿账号密码，
-      // 一回来就重新起浏览器没必要。卡片还亮着，再点一下就行。
+      // 切到后台就「休眠」，而不是断开。
+      //
+      // 休眠 = 后端停掉帧流，但浏览器留着、画面留着、登录态留着。
+      // 切回来立刻接着玩，不用重新进游戏——重进一次云原神要几十秒。
+      //
+      // 说清楚它省什么、不省什么（实测）：
+      //   省：帧流（休眠期间一张帧都不发）
+      //   不省：内存（约 725 MB 还是占着）、CPU（这页面本来就不烧）
+      // 真正把内存还回来的是后端那道休眠超时——默认 5 分钟没人回来
+      // 就把会话整个关掉。所以查个攻略无感，去吃饭则会被回收。
       document.addEventListener('visibilitychange', () => {
-        if(document.hidden) disconnect();
+        if(document.hidden){
+          // 还在重连中或是根本没连上，就没什么可睡的
+          if(ws && ws.readyState === WebSocket.OPEN){
+            send({ type:'sleep' });
+            sleeping = true;
+          }
+        } else if(sleeping){
+          sleeping = false;
+          // 唤醒前先探一下连接还在不在：切后台期间可能被系统断过、
+          // 或者后端已经因为休眠超时把会话关了。
+          if(ws && ws.readyState === WebSocket.OPEN){
+            send({ type:'wake' });
+          } else {
+            // 连接没了就重新连，等于重新开会话
+            setStatus('重连中…');
+            connect();
+          }
+        }
       });
     },
 

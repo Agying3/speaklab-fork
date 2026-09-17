@@ -42,6 +42,14 @@ pub struct CloudConfig {
     /// 画面宽高。这是卡片里那块地方的实际像素尺寸。
     pub max_width: u32,
     pub max_height: u32,
+    /// 会话休眠多久之后彻底关掉（秒）。0 表示不自动回收。
+    ///
+    /// 前端切到后台时会话进入休眠：只停帧流，浏览器留着、画面和
+    /// 登录态都在，切回来不用重进游戏。**但内存并不因此释放**
+    /// （实测休眠约 725 MB，醒着约 764 MB），真正还回内存的是这道超时。
+    ///
+    /// 默认 5 分钟：够查个攻略，又不至于让离开的会话一直挂着。
+    pub dormant_timeout_secs: u64,
 }
 
 impl CloudConfig {
@@ -167,6 +175,10 @@ impl Config {
                 quality: env_usize("SPEAKLAB_CLOUD_QUALITY", 60).clamp(10, 100) as u8,
                 max_width: env_usize("SPEAKLAB_CLOUD_WIDTH", 480).clamp(160, 1920) as u32,
                 max_height: env_usize("SPEAKLAB_CLOUD_HEIGHT", 320).clamp(120, 1080) as u32,
+                // 上限给到 1 天。0 是有意义的取值（不自动回收），
+                // 所以不能直接 clamp 到 [1, ..]。
+                dormant_timeout_secs: env_usize("SPEAKLAB_CLOUD_SLEEP_TIMEOUT", 300)
+                    .min(86_400) as u64,
             },
         })
     }

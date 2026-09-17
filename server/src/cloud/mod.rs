@@ -85,6 +85,14 @@ pub struct CloudService {
     pub default_quality: u8,
     pub default_max_width: u32,
     pub default_max_height: u32,
+    /// 会话休眠多久之后彻底关掉（秒）。
+    ///
+    /// **这道超时才是真正释放内存的地方。** 休眠本身只是停发帧，
+    /// 浏览器那约 700 MB 还占着（实测休眠 725 MB vs 醒着 764 MB）。
+    ///
+    /// 分界线就是「人还在不在」：切后台查个攻略是几十秒的事，切走去
+    /// 吃饭就是几十分钟。前者保活，后者该把内存还回来。
+    pub dormant_timeout_secs: u64,
 }
 
 impl CloudService {
@@ -95,6 +103,7 @@ impl CloudService {
         quality: u8,
         max_width: u32,
         max_height: u32,
+        dormant_timeout_secs: u64,
     ) -> Self {
         Self {
             browser_exe,
@@ -105,6 +114,7 @@ impl CloudService {
             default_quality: quality,
             default_max_width: max_width,
             default_max_height: max_height,
+            dormant_timeout_secs,
         }
     }
 
@@ -220,5 +230,50 @@ impl CloudService {
         for (_, s) in sessions.drain() {
             s.shutdown().await;
         }
+    }
+
+    /// 起一个后台任务，定期把「休眠太久没人回来」的会话关掉。
+    ///
+    /// 这是唯一真正释放内存的地方：休眠只停帧流，浏览器还在，
+    /// 实测休眠时仍占约 725 MB。用户切后台查攻略是几十秒的事，
+    /// 切走去吃饭就是几十分钟——这条线就是区分两者的。
+    pub fn spawn_reaper(self: &Arc<Self>) {
+        if self.dormant_timeout_secs == 0 {
+            tracing::info!("休眠超时设为 0，会话不会被自动回收");
+            return;
+        }
+        let me = Arc::clone(self);
+        let timeout = std::time::Duration::from_secs(self.dormant_timeout_secs);
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(10));
+            loop {
+                tick.tick().await;
+
+                // 先收集要关的，再逐个关——不能拿着 sessions 的锁去
+                // await（close 也要拿同一把锁，会死锁）。
+                let victims: Vec<(String, Arc<Session>)> = {
+                    let guard = me.sessions.lock().await;
+                    guard
+                        .iter()
+                        .filter(|(_, s)| s.is_dormant() && s.idle_for() >= timeout)
+                        .map(|(k, s)| (k.clone(), Arc::clone(s)))
+                        .collect()
+                };
+
+                for (name, s) in victims {
+                    // 再确认一次还没醒：收集和关闭之间用户可能刚好
+                    // 切回来了，那就别关了。
+                    if !s.is_dormant() || s.idle_for() < timeout {
+                        continue;
+                    }
+                    tracing::info!(
+                        target = name,
+                        idle_secs = s.idle_for().as_secs(),
+                        "休眠超时，关掉会话"
+                    );
+                    me.close(&name).await;
+                }
+            }
+        });
     }
 }

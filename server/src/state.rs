@@ -21,21 +21,25 @@ struct Inner {
     asr_gate: Semaphore,
     started_at: std::time::Instant,
     store: crate::store::Store,
-    cloud: crate::cloud::CloudService,
+    /// 用 Arc 包着是因为回收任务（`spawn_reaper`）也要持有一份。
+    cloud: std::sync::Arc<crate::cloud::CloudService>,
 }
 
 impl AppState {
     pub async fn new(config: Config, store: crate::store::Store) -> anyhow::Result<Self> {
         let permits = config.asr.max_concurrency.max(1);
 
-        let cloud = crate::cloud::CloudService::new(
+        let cloud = std::sync::Arc::new(crate::cloud::CloudService::new(
             config.cloud.browser_exe.clone(),
             config.cloud.profile_root.clone(),
             config.cloud.port_base,
             config.cloud.quality,
             config.cloud.max_width,
             config.cloud.max_height,
-        );
+            config.cloud.dormant_timeout_secs,
+        ));
+        // 把「休眠太久没人回来」的会话收掉。
+        cloud.spawn_reaper();
 
         Ok(Self {
             inner: Arc::new(Inner {

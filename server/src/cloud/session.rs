@@ -134,6 +134,28 @@ pub struct Session {
     /// 一个无头 Edge 大约 700 MB，用户关掉标签页却留着进程不管，
     /// 开几次就把内存吃满了。见 `routes::cloud` 里 WebSocket 结束后的处理。
     watchers: AtomicU32,
+    /// 会话是不是在休眠。
+    ///
+    /// 用户把页面切到后台时就进入休眠：**浏览器留着**（画面、登录态都在，
+    /// 切回来不用重进游戏），但停掉帧流。
+    ///
+    /// 实测说明白它到底省什么（480x320 的云原神页面）：
+    /// - 内存 **不省**：休眠时约 725 MB，醒着约 764 MB，差异是波动。
+    ///   浏览器进程、渲染器、页面本身全都还在。
+    /// - CPU **基本不省**：这页面本来就闲（15 秒 TaskDuration 约 18ms，
+    ///   合 0.12%）。停发帧不影响浏览器自己的渲染循环。
+    /// - 真正停掉的是帧流本身：休眠期间一张帧都不发。
+    ///
+    /// 那留着它干什么？**价值在于「切后台不要立刻杀」**。用户切走
+    /// 查个攻略再切回来，画面还在、接着玩；重进一次云原神要几十秒。
+    /// 真正把内存还回来的是 `dormant_timeout` 那道超时，不是这里。
+    dormant: Arc<AtomicBool>,
+    /// 最后一次有人看这条会话的时刻（用于休眠超时判定）。
+    ///
+    /// 存 Instant 而不是「睡了多少秒」：后者要有人定期去加，
+    /// 而定期加的活儿本身就是多余的开销。用时刻相减更简单，
+    /// 也不需要额外的后台计时器。
+    last_seen: Arc<std::sync::Mutex<std::time::Instant>>,
 }
 
 impl Session {
@@ -238,6 +260,10 @@ impl Session {
         let (tx, _) = broadcast::channel::<Outgoing>(8);
         let alive = Arc::new(AtomicBool::new(true));
         let frames_sent = Arc::new(AtomicU64::new(0));
+        // 放在这里而不是结构体字面量里 new 一个：下面几个后台循环
+        // 都要共享同一个标志，各 new 各的就收不到休眠通知了。
+        let dormant = Arc::new(AtomicBool::new(false));
+        let last_seen = Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
 
         let session = Self {
             target,
@@ -251,6 +277,8 @@ impl Session {
             width: AtomicU32::new(max_width),
             height: AtomicU32::new(max_height),
             watchers: AtomicU32::new(0),
+            dormant: Arc::clone(&dormant),
+            last_seen: Arc::clone(&last_seen),
         };
 
         // 等页面真的变成 "active page" 再开帧流。
@@ -405,6 +433,7 @@ impl Session {
         let sid_sc = Arc::clone(&current_sid);
         // 自愈循环里主动抓的兜底帧也从同一个通道发出去
         let tx_fallback = tx.clone();
+        let dormant_sc = Arc::clone(&dormant);
         tokio::spawn(async move {
             let q = quality;
             let (mw, mh) = (max_width, max_height);
@@ -454,11 +483,44 @@ impl Session {
             // 心跳流量。静态页面上这纯属浪费（画面没变，前端也不需要
             // 重发），所以两次主动抓帧之间至少隔这么久。
             let mut last_grab = std::time::Instant::now();
+            // 上一轮是不是在休眠。用它检测「刚被叫醒」这个边沿：
+            // 睡着的期间帧流是停的，醒过来必须重新开一次，
+            // 否则前端会一直停在睡前的最后一帧。
+            let mut was_dormant = false;
 
             while alive_sc.load(Ordering::Relaxed) {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 if !alive_sc.load(Ordering::Relaxed) {
                     break;
+                }
+
+                let sleeping = dormant_sc.load(Ordering::Relaxed);
+
+                // 休眠期间什么都不做：不查帧、不抓兜底帧、不动 screencast。
+                // 这正是休眠省下来的东西——之前静止的会话每 10 秒
+                // 还会让浏览器编码一张 JPEG 出来。
+                if sleeping {
+                    was_dormant = true;
+                    continue;
+                }
+
+                // 刚被叫醒：把帧流重新开起来，并把判据重置，
+                // 免得拿睡前的时间戳去算「静止了多久」。
+                if was_dormant {
+                    was_dormant = false;
+                    let cur = read_sid(&sid_sc);
+                    let _ = cdp_sc
+                        .call_on("Page.stopScreencast", json!({}), Some(&cur))
+                        .await;
+                    match start(cdp_sc.clone(), cur.clone()).await {
+                        Ok(_) => tracing::debug!("唤醒后重开帧流"),
+                        Err(e) => tracing::debug!(error = %e, "唤醒后重开帧流失败"),
+                    }
+                    last_sid = cur;
+                    last_seen = counter_sc.load(Ordering::Relaxed);
+                    last_grab = std::time::Instant::now();
+                    idle_ticks = 0;
+                    continue;
                 }
 
                 // 目标页面可能已经换了（跟随新标签页），换了就立刻重开
@@ -553,6 +615,7 @@ impl Session {
         let cdp_frames = cdp.clone();
         let alive_frames = Arc::clone(&alive);
         let counter = Arc::clone(&frames_sent);
+        let dormant_frames = Arc::clone(&dormant);
 
         tokio::spawn(async move {
             loop {
@@ -571,6 +634,11 @@ impl Session {
                 if !alive_frames.load(Ordering::Relaxed) {
                     break;
                 }
+
+                // 休眠期间照常 ack（不 ack 会把浏览器的 screencast 卡死），
+                // 但不再往前端广播。省下的主要是这条 WebSocket 上的流量——
+                // 别指望它省 CPU，浏览器自己的渲染循环不受影响。
+                let sleeping = dormant_frames.load(Ordering::Relaxed);
 
                 match ev.method.as_str() {
                     "Page.screencastFrame" => {
@@ -606,6 +674,13 @@ impl Session {
                         });
 
                         if data.is_empty() {
+                            continue;
+                        }
+
+                        // 休眠时不计数也不转发。不计数很重要：自愈循环
+                        // 靠这个计数判断「页面是不是在出帧」，休眠期间
+                        // 它不该被唤醒去重开 screencast。
+                        if sleeping {
                             continue;
                         }
 
@@ -689,9 +764,61 @@ impl Session {
         self.tx.subscribe()
     }
 
+    /// 让会话进入休眠：停帧流，浏览器留着。
+    ///
+    /// 幂等——重复调用不会重复停。
+    pub async fn sleep(&self) {
+        if self.dormant.swap(true, Ordering::Relaxed) {
+            return; // 已经在睡了
+        }
+        let sid = self.sid();
+        if let Err(e) = self
+            .cdp
+            .call_on("Page.stopScreencast", json!({}), Some(&sid))
+            .await
+        {
+            // 停不掉不算致命：帧流循环每轮都会看一眼 dormant 标志，
+            // 就算 screencast 还开着，帧也不会再往前端发。
+            tracing::debug!(error = %e, "休眠时停帧流失败");
+        }
+        tracing::info!(target = self.target.name, "会话休眠（浏览器保留）");
+    }
+
+    /// 把会话叫醒：重新开帧流。
+    pub async fn wake(&self) {
+        if !self.dormant.swap(false, Ordering::Relaxed) {
+            return; // 本来就没睡
+        }
+        self.touch();
+        tracing::info!(target = self.target.name, "会话唤醒");
+        // 帧流循环下一次 tick 会看到 dormant 变回 false，
+        // 由它负责重开 screencast——那里已经处理了「先停再开」，
+        // 不在这里重复一套。
+    }
+
+    pub fn is_dormant(&self) -> bool {
+        self.dormant.load(Ordering::Relaxed)
+    }
+
+    /// 记录「现在还有人看」。休眠超时判定用它。
+    fn touch(&self) {
+        if let Ok(mut t) = self.last_seen.lock() {
+            *t = std::time::Instant::now();
+        }
+    }
+
+    /// 自从最后一次有人看，过了多久。
+    pub fn idle_for(&self) -> std::time::Duration {
+        self.last_seen
+            .lock()
+            .map(|t| t.elapsed())
+            .unwrap_or_default()
+    }
+
     /// 记一个前端开始看这条会话。
     pub fn add_watcher(&self) {
         self.watchers.fetch_add(1, Ordering::Relaxed);
+        self.touch();
     }
 
     /// 记一个前端不看了，返回剩下的观众数。
@@ -748,6 +875,26 @@ impl Session {
     /// 和后端浏览器视口尺寸不一定一样，在前端做归一化最省事，
     /// 后端只管乘回去。
     pub async fn input(&self, event: InputEvent) -> AppResult<()> {
+        match event {
+            // 这两个不碰页面，只是开关帧流，所以放在最前面。
+            InputEvent::Sleep => {
+                self.sleep().await;
+                return Ok(());
+            }
+            InputEvent::Wake => {
+                self.wake().await;
+                return Ok(());
+            }
+            _ => {}
+        }
+
+        // 休眠期间来的输入直接丢掉：页面在后台，没人会去点它，
+        // 而且有些事件（比如鼠标移动）会触发重绘，把省下来的
+        // 那点开销又还回去。唤醒后前端会重新同步状态。
+        if self.is_dormant() {
+            return Ok(());
+        }
+
         // 读一次就够，中途 Resize 也不用重读——一个事件对应一个坐标。
         let (w, h) = self.size();
         let (w, h) = (w as f64, h as f64);
@@ -884,6 +1031,10 @@ impl Session {
                     )
                     .await?;
             }
+            // 这两个在上面已经处理过并提前 return 了。
+            // 保留分支是为了让 match 穷尽——去掉的话编译器会报
+            // non-exhaustive，而这个 match 又是刻意保留穷尽性的。
+            InputEvent::Sleep | InputEvent::Wake => {}
         }
         Ok(())
     }
@@ -977,4 +1128,8 @@ pub enum InputEvent {
         width: u32,
         height: u32,
     },
+    /// 前端切到后台了。会话休眠：停帧流，浏览器留着。
+    Sleep,
+    /// 前端切回来了。重新开帧流。画面还在，不用重进游戏。
+    Wake,
 }
