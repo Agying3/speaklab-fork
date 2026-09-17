@@ -87,11 +87,13 @@ pub struct CloudService {
     pub default_max_height: u32,
     /// 会话休眠多久之后彻底关掉（秒）。
     ///
-    /// **这道超时才是真正释放内存的地方。** 休眠本身只是停发帧，
-    /// 浏览器那约 700 MB 还占着（实测休眠 725 MB vs 醒着 764 MB）。
+    /// **这是唯一真正释放内存的地方。** 休眠只是停发帧，浏览器那
+    /// 700~800 MB 还占着；实测连把游戏页面卸载掉也只回落 63 MB，
+    /// 因为那些内存几乎全是浏览器骨架（空的 Edge 本身就占 833 MB）。
+    /// 所以只有杀掉进程才真的还回来。
     ///
     /// 分界线就是「人还在不在」：切后台查个攻略是几十秒的事，切走去
-    /// 吃饭就是几十分钟。前者保活，后者该把内存还回来。
+    /// 吃饭就是几十分钟。前者保活（切回来不用重进游戏），后者回收。
     pub dormant_timeout_secs: u64,
 }
 
@@ -137,6 +139,17 @@ impl CloudService {
     ///
     /// 已有的会话直接复用——用户刷新页面不该让云游戏重开一次，
     /// 那意味着重新登录。
+    ///
+    /// **每个 target 一个独立浏览器。** 试过让多个 target 共用一个
+    /// 浏览器进程（各自一个标签页），内存确实能从 1517 MB 降到
+    /// 1055 MB，但跟「跟随新标签页」这个功能根本冲突：
+    /// 每条会话的追踪循环都在 `Target.setDiscoverTargets` 上看整个
+    /// 浏览器的新页面，两张卡会互相把对方的标签页抢过来。
+    /// 实测开了云崩铁之后，云原神的帧流就废了（"首次开帧流失败"）。
+    ///
+    /// 要改共享得先把追踪做成「按会话隔离」（只跟自己创建的那条
+    /// 标签页链），那是另一个量级的改动。眼下省内存靠调短
+    /// `dormant_timeout`——不看的会话尽快回收，效果一样实在。
     pub async fn session(&self, target: &'static Target) -> AppResult<Arc<Session>> {
         let mut sessions = self.sessions.lock().await;
 
@@ -239,7 +252,7 @@ impl CloudService {
     /// 切走去吃饭就是几十分钟——这条线就是区分两者的。
     pub fn spawn_reaper(self: &Arc<Self>) {
         if self.dormant_timeout_secs == 0 {
-            tracing::info!("休眠超时设为 0，会话不会被自动回收");
+            tracing::info!("休眠超时设为 0，后台会话不会被自动回收");
             return;
         }
         let me = Arc::clone(self);

@@ -48,7 +48,7 @@ pub struct CloudConfig {
     /// 登录态都在，切回来不用重进游戏。**但内存并不因此释放**
     /// （实测休眠约 725 MB，醒着约 764 MB），真正还回内存的是这道超时。
     ///
-    /// 默认 5 分钟：够查个攻略，又不至于让离开的会话一直挂着。
+    /// 默认 90 秒。**这是唯一真正省内存的旋钮**（见下面实现处的说明）。
     pub dormant_timeout_secs: u64,
 }
 
@@ -177,7 +177,16 @@ impl Config {
                 max_height: env_usize("SPEAKLAB_CLOUD_HEIGHT", 320).clamp(120, 1080) as u32,
                 // 上限给到 1 天。0 是有意义的取值（不自动回收），
                 // 所以不能直接 clamp 到 [1, ..]。
-                dormant_timeout_secs: env_usize("SPEAKLAB_CLOUD_SLEEP_TIMEOUT", 300)
+                // 默认 90 秒。这是**唯一真正省内存的旋钮**：
+                // 休眠只是停发帧，浏览器那 700 多 MB 照占着
+                // （实测连卸载页面也只回落 63 MB，因为那些内存
+                // 几乎全是浏览器骨架——空的 Edge 本身就占 833 MB）。
+                // 只有杀掉进程才真的还回来。
+                //
+                // 90 秒够切走查个攻略再切回来（那期间画面还在，
+                // 不用重进游戏），走去吃饭就会被回收。
+                // 想更激进就调小，0 表示永不回收。
+                dormant_timeout_secs: env_usize("SPEAKLAB_CLOUD_SLEEP_TIMEOUT", 90)
                     .min(86_400) as u64,
             },
         })

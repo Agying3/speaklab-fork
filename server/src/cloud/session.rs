@@ -111,7 +111,9 @@ pub struct Session {
     page_session: std::sync::RwLock<String>,
     /// 整个浏览器窗口的目标 id。
     target_id: String,
-    browser: Option<Browser>,
+    /// 这个会话的浏览器。每条会话一个独立进程——试过共享，
+    /// 但跟「跟随新标签页」冲突（见 `CloudService::session` 的注释）。
+    browser: Browser,
     /// 帧和事件的广播源。
     ///
     /// 容量给 8：前端消费得慢时宁可丢旧帧也不要堆积。
@@ -167,6 +169,17 @@ impl Session {
             .unwrap_or_default()
     }
     pub async fn start(
+        target: &'static Target,
+        browser: Browser,
+        cdp: Cdp,
+        quality: u8,
+        max_width: u32,
+        max_height: u32,
+    ) -> AppResult<Self> {
+        Self::start_with(target, browser, cdp, quality, max_width, max_height).await
+    }
+
+    async fn start_with(
         target: &'static Target,
         browser: Browser,
         cdp: Cdp,
@@ -270,7 +283,7 @@ impl Session {
             cdp: cdp.clone(),
             page_session: std::sync::RwLock::new(page_session.clone()),
             target_id: target_id.clone(),
-            browser: Some(browser),
+            browser,
             tx: tx.clone(),
             alive: Arc::clone(&alive),
             frames_sent: Arc::clone(&frames_sent),
@@ -764,6 +777,16 @@ impl Session {
         self.tx.subscribe()
     }
 
+    /// 这条会话的 target 名。共享浏览器时用来打日志区分。
+    pub fn target_name(&self) -> &'static str {
+        self.target.name
+    }
+
+    /// 拿到这条会话用的 CDP 句柄。
+    pub fn cdp_handle(&self) -> Cdp {
+        self.cdp.clone()
+    }
+
     /// 让会话进入休眠：停帧流，浏览器留着。
     ///
     /// 幂等——重复调用不会重复停。
@@ -791,14 +814,12 @@ impl Session {
         }
         self.touch();
         tracing::info!(target = self.target.name, "会话唤醒");
-        // 帧流循环下一次 tick 会看到 dormant 变回 false，
-        // 由它负责重开 screencast——那里已经处理了「先停再开」，
-        // 不在这里重复一套。
     }
 
     pub fn is_dormant(&self) -> bool {
         self.dormant.load(Ordering::Relaxed)
     }
+
 
     /// 记录「现在还有人看」。休眠超时判定用它。
     fn touch(&self) {
@@ -1048,7 +1069,8 @@ impl Session {
         Ok(())
     }
 
-    /// 关掉会话：停帧流、关标签页、杀浏览器。**保留登录态。**
+    /// 关掉会话：停帧流、关标签页、（只有自己拥有浏览器时）杀浏览器。
+    /// **保留登录态。**
     ///
     /// 收 `&self` 而不是 `self`：调用方基本都通过 `Arc<Session>` 拿到它，
     /// 想按值传就得先把所有克隆都丢掉（`Arc::into_inner`），而 WebSocket
@@ -1066,6 +1088,7 @@ impl Session {
     async fn shutdown_inner(&self, forget_login: bool) {
         self.alive.store(false, Ordering::Relaxed);
         let sid = self.sid();
+        // 只停自己的帧流、只关自己那个标签页。
         let _ = self
             .cdp
             .call_on("Page.stopScreencast", json!({}), Some(&sid))
@@ -1075,12 +1098,11 @@ impl Session {
             .call("Target.closeTarget", json!({ "targetId": self.target_id }))
             .await;
 
-        if let Some(browser) = self.browser.as_ref() {
-            if forget_login {
-                browser.shutdown_and_forget().await;
-            } else {
-                browser.shutdown().await;
-            }
+        // 这条会话自己就拥有一个浏览器（不共享），直接关掉。
+        if forget_login {
+            self.browser.shutdown_and_forget().await;
+        } else {
+            self.browser.shutdown().await;
         }
         tracing::info!(target = self.target.name, forget_login, "云游戏会话已关闭");
     }
