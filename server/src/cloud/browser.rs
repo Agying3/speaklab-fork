@@ -34,7 +34,10 @@ use crate::error::{AppError, AppResult};
 
 /// 一个正在跑的浏览器实例。
 pub struct Browser {
-    child: Child,
+    /// `Option` 是为了让 `shutdown` 能收 `&self`：tokio 的 `Child::kill`
+    /// 要 `&mut`，而调用方（`Session::shutdown`）手上只有共享引用。
+    /// 关掉之后置 `None`，重复调用就是空操作——关会话这动作本身幂等。
+    child: std::sync::Mutex<Option<Child>>,
     /// CDP 的浏览器级 WebSocket 地址。
     pub ws_url: String,
     /// 用户数据目录。每次启动用独立的目录，避免和用户自己的
@@ -106,7 +109,7 @@ impl Browser {
         let ws_url = wait_for_devtools(port).await?;
 
         Ok(Self {
-            child,
+            child: std::sync::Mutex::new(Some(child)),
             ws_url,
             profile_dir,
             port,
@@ -122,17 +125,24 @@ impl Browser {
     /// 想清干净就删那个目录，或者调 `DELETE /api/v1/cloud/:target/profile`。
     /// 这是本机自部署的东西，凭证存在自己机器上可以接受；但如果哪天
     /// 要把它部署到公网，这里必须先改成不落盘。
-    pub async fn shutdown(mut self) {
-        let _ = self.child.kill().await;
+    pub async fn shutdown(&self) {
+        let child = self.child.lock().ok().and_then(|mut g| g.take());
+        let Some(mut child) = child else {
+            return; // 已经关过了
+        };
+        let _ = child.kill().await;
         // 等进程真正退出。不删目录，但得等它退出，否则下次启动
         // 会因为配置目录被占用而失败。
-        let _ = self.child.wait().await;
+        let _ = child.wait().await;
     }
 
     /// 连配置目录一起删掉。用户在界面上点「退出登录」时用。
-    pub async fn shutdown_and_forget(mut self) {
-        let _ = self.child.kill().await;
-        let _ = self.child.wait().await;
+    pub async fn shutdown_and_forget(&self) {
+        let child = self.child.lock().ok().and_then(|mut g| g.take());
+        if let Some(mut child) = child {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+        }
         if let Err(e) = std::fs::remove_dir_all(&self.profile_dir) {
             tracing::warn!(dir = %self.profile_dir.display(), error = %e, "清理浏览器配置目录失败");
         }

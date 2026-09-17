@@ -291,7 +291,9 @@ const CloudCard = (() => {
 
       bindInput();
 
-      // 页面切走时断开，省掉一个一直跑的浏览器进程
+      // 页面切到后台就断开，省掉一个一直跑的浏览器进程。
+      // 切回来不自动重连——用户可能只是去别的标签页拿账号密码，
+      // 一回来就重新起浏览器没必要。卡片还亮着，再点一下就行。
       document.addEventListener('visibilitychange', () => {
         if(document.hidden) disconnect();
       });

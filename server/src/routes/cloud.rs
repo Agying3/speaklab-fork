@@ -54,7 +54,9 @@ pub async fn list(State(state): State<AppState>) -> Json<CloudList> {
             .map(|t| TargetInfo {
                 name: t.name,
                 title: t.title,
-                running: false, // 列表接口不查状态，避免为了显示去启动浏览器
+                // 之前这里写死 false，列接口因此永远报「没在跑」，
+                // 前端没法知道某路是不是已经开着。
+                running: state.cloud().is_running(t.name),
             })
             .collect(),
     })
@@ -121,6 +123,10 @@ async fn handle(socket: WebSocket, state: AppState, target: &'static crate::clou
 
     let (w, h) = session.size();
 
+    // 从这一刻起算「有人在看」。WebSocket 结束时如果这是最后一个观众，
+    // 下面会把整个浏览器关掉。
+    session.add_watcher();
+
     // 先告诉前端会话信息，它据此设置画布比例
     let ready = serde_json::json!({
         "type": "ready",
@@ -130,6 +136,11 @@ async fn handle(socket: WebSocket, state: AppState, target: &'static crate::clou
         "height": h,
     });
     if sink.send(Message::Text(ready.to_string())).await.is_err() {
+        // 连 ready 都发不出去，说明对方已经走了。这里也要把观众数减回去，
+        // 否则计数只增不减，会话永远关不掉。
+        if session.remove_watcher() == 0 {
+            state.cloud().close(target.name).await;
+        }
         return;
     }
 
@@ -189,6 +200,19 @@ async fn handle(socket: WebSocket, state: AppState, target: &'static crate::clou
     tokio::select! {
         _ = &mut send_task => recv_task.abort(),
         _ = &mut recv_task => send_task.abort(),
+    }
+
+    // 最后一个观众走了就把浏览器关掉。
+    //
+    // 不关的话，用户关掉标签页留下的无头 Edge 会一直挂着——一个约
+    // 700 MB，还带着在跑的页面。之前就是这样：日志里 WebSocket 早
+    // 结束了，兜底抓帧还在每 10 秒一次地跑。
+    //
+    // 登录态不会因此丢：profile 目录是按 target 固定保留的，
+    // 下次进来还是登录状态。只有 forget 接口才会真清掉。
+    if session.remove_watcher() == 0 {
+        tracing::info!(target = target.name, "最后一个客户端断开，关掉会话");
+        state.cloud().close(target.name).await;
     }
 
     tracing::debug!(target = target.name, "WebSocket 会话结束");

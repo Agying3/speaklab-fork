@@ -128,6 +128,12 @@ pub struct Session {
     /// 有可能被并发调用（拖动时 start/move/end 会连发）。
     width: AtomicU32,
     height: AtomicU32,
+    /// 当前有几个前端在看这条会话。
+    ///
+    /// 用来判断「最后一个观众走了没有」。走了就该把浏览器关掉——
+    /// 一个无头 Edge 大约 700 MB，用户关掉标签页却留着进程不管，
+    /// 开几次就把内存吃满了。见 `routes::cloud` 里 WebSocket 结束后的处理。
+    watchers: AtomicU32,
 }
 
 impl Session {
@@ -244,6 +250,7 @@ impl Session {
             frames_sent: Arc::clone(&frames_sent),
             width: AtomicU32::new(max_width),
             height: AtomicU32::new(max_height),
+            watchers: AtomicU32::new(0),
         };
 
         // 等页面真的变成 "active page" 再开帧流。
@@ -682,6 +689,36 @@ impl Session {
         self.tx.subscribe()
     }
 
+    /// 记一个前端开始看这条会话。
+    pub fn add_watcher(&self) {
+        self.watchers.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// 记一个前端不看了，返回剩下的观众数。
+    ///
+    /// 用 `fetch_sub` 后减一的结果判断，而不是先读再加锁：
+    /// 两个标签页同时关闭时，"读到 1 然后各减一次"会让两边都以为
+    /// 自己是最后一个，把还在看的那个人的浏览器也关掉。
+    pub fn remove_watcher(&self) -> u32 {
+        // 用 CAS 循环兜住下溢：万一将来有路径少调了 add_watcher，
+        // 这里也不会把计数减成 4294967295 而永远关不掉会话。
+        let mut cur = self.watchers.load(Ordering::Relaxed);
+        loop {
+            if cur == 0 {
+                return 0;
+            }
+            match self.watchers.compare_exchange_weak(
+                cur,
+                cur - 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return cur - 1,
+                Err(actual) => cur = actual,
+            }
+        }
+    }
+
     pub fn size(&self) -> (u32, u32) {
         (
             self.width.load(Ordering::Relaxed),
@@ -861,16 +898,21 @@ impl Session {
     }
 
     /// 关掉会话：停帧流、关标签页、杀浏览器。**保留登录态。**
-    pub async fn shutdown(self) {
+    ///
+    /// 收 `&self` 而不是 `self`：调用方基本都通过 `Arc<Session>` 拿到它，
+    /// 想按值传就得先把所有克隆都丢掉（`Arc::into_inner`），而 WebSocket
+    /// 处理函数和输入注入任务手上都还攥着克隆——那样结果是关不掉。
+    /// 关会话是幂等的，被调多次没关系。
+    pub async fn shutdown(&self) {
         self.shutdown_inner(false).await;
     }
 
     /// 同上，但连登录态一起清掉。
-    pub async fn shutdown_and_forget(self) {
+    pub async fn shutdown_and_forget(&self) {
         self.shutdown_inner(true).await;
     }
 
-    async fn shutdown_inner(self, forget_login: bool) {
+    async fn shutdown_inner(&self, forget_login: bool) {
         self.alive.store(false, Ordering::Relaxed);
         let sid = self.sid();
         let _ = self
@@ -882,7 +924,7 @@ impl Session {
             .call("Target.closeTarget", json!({ "targetId": self.target_id }))
             .await;
 
-        if let Some(browser) = self.browser {
+        if let Some(browser) = self.browser.as_ref() {
             if forget_login {
                 browser.shutdown_and_forget().await;
             } else {

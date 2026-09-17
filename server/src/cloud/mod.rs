@@ -112,6 +112,17 @@ impl CloudService {
         self.browser_exe.is_some()
     }
 
+    /// 某个 target 的会话是不是正跑着。
+    ///
+    /// 用 `try_lock`：这个只在列接口里用，拿不到锁说明别的请求正在
+    /// 建/关会话，那就先报「没在跑」，没必要为了一行状态去排队等。
+    pub fn is_running(&self, name: &str) -> bool {
+        match self.sessions.try_lock() {
+            Ok(m) => m.contains_key(name),
+            Err(_) => false,
+        }
+    }
+
     /// 拿到（必要时新建）某个 target 的会话。
     ///
     /// 已有的会话直接复用——用户刷新页面不该让云游戏重开一次，
@@ -169,26 +180,30 @@ impl CloudService {
     }
 
     /// 关掉某路会话。
+    ///
+    /// 从表里摘掉之后**无论如何都要 shutdown**，不能只处理
+    /// `Arc::into_inner` 成功的情况：调用方（WebSocket 处理函数、
+    /// 输入注入任务）手上通常还攥着 Arc 克隆，`into_inner` 会返回
+    /// Err，那样浏览器进程就永远关不掉了。`shutdown` 内部是幂等的，
+    /// 重复调没关系。
     pub async fn close(&self, name: &str) -> bool {
         let mut sessions = self.sessions.lock().await;
-        if let Some(s) = sessions.remove(name) {
-            // Arc 可能还有别的持有者，但 shutdown 内部是幂等的
-            if let Some(s) = Arc::into_inner(s) {
-                s.shutdown().await;
-            }
-            return true;
-        }
-        false
+        let Some(s) = sessions.remove(name) else {
+            return false;
+        };
+        s.shutdown().await;
+        true
     }
 
     /// 关掉会话并清掉登录态。用户点「退出登录」时用。
     pub async fn forget(&self, name: &str) -> AppResult<()> {
         let mut sessions = self.sessions.lock().await;
         if let Some(s) = sessions.remove(name) {
-            if let Some(s) = Arc::into_inner(s) {
-                s.shutdown_and_forget().await;
-                return Ok(());
-            }
+            // 这里不能 return，反正后面还要删目录；
+            // 而且就算 Arc 还被别处持有，也必须先把浏览器停掉，
+            // 否则它握着 profile 目录不放，删目录会失败。
+            s.shutdown_and_forget().await;
+            return Ok(());
         }
         // 会话本来就没在跑，直接删目录
         let dir = self.profile_root.join(format!("profile-{name}"));
@@ -203,9 +218,7 @@ impl CloudService {
     pub async fn close_all(&self) {
         let mut sessions = self.sessions.lock().await;
         for (_, s) in sessions.drain() {
-            if let Some(s) = Arc::into_inner(s) {
-                s.shutdown().await;
-            }
+            s.shutdown().await;
         }
     }
 }
