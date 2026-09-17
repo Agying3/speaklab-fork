@@ -20,7 +20,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast;
 
@@ -995,18 +995,37 @@ impl Session {
                     "up" => "keyUp",
                     _ => return Err(AppError::BadRequest(format!("未知的按键类型 {kind}"))),
                 };
+
+                // **`text` 是必须的。** 这是实测挖出来的坑：
+                // 只给 key/code/vk 的话，页面能收到 keydown，
+                // 但不会产生字符——没有 keypress、没有 beforeinput、
+                // 没有 input，输入框里什么都不出现。
+                // 因为 CDP 靠 `text` 才知道"这次按键要插入什么"，
+                // 不给就等于按了一个没有字符的键（比如 Shift）。
+                //
+                // 对比实测（同一个手机号输入框）：
+                //   带 text   -> keydown keypress beforeinput input keyup
+                //   不带 text -> keydown keyup          （value 不变）
+                //
+                // 规则：只在 keyDown 给 text（keyUp 给 text 会插两次）；
+                // 只给"能打出来的字符"——单字符的 key 才算，
+                // 且要排除功能键（Enter/Tab/Backspace 的名字不止一个字符，
+                // 天然被长度条件挡住）。
+                let mut params = json!({
+                    "type": ty,
+                    "key": key,
+                    "code": code,
+                    "windowsVirtualKeyCode": vk,
+                    "nativeVirtualKeyCode": vk,
+                });
+                if ty == "keyDown" && key.chars().count() == 1 {
+                    params["text"] = json!(key);
+                    // unmodifiedText 是"没按修饰键时的字符"，
+                    // 给上更稳（Shift+1 出 '!' 时两者不同）。
+                    params["unmodifiedText"] = json!(key);
+                }
                 self.cdp
-                    .call_on(
-                        "Input.dispatchKeyEvent",
-                        json!({
-                            "type": ty,
-                            "key": key,
-                            "code": code,
-                            "windowsVirtualKeyCode": vk,
-                            "nativeVirtualKeyCode": vk,
-                        }),
-                        Some(&sid),
-                    )
+                    .call_on("Input.dispatchKeyEvent", params, Some(&sid))
                     .await?;
             }
             InputEvent::Text { text } => {
@@ -1108,6 +1127,21 @@ impl Session {
     }
 }
 
+/// 把 JSON 里的 `null` 当成「没给」。
+///
+/// `#[serde(default)]` 只处理字段**缺失**，碰上显式的 `null` 会报
+/// `invalid type: null, expected a string` 而整条消息作废。
+/// 前端在拿不到某个值时习惯传 `null`（比传空字符串自然），
+/// 所以这里显式兜一下，别让一条按键因为一个可选字段丢掉。
+fn null_as_default<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de> + Default,
+{
+    let v = Option::<T>::deserialize(d)?;
+    Ok(v.unwrap_or_default())
+}
+
 /// 前端发来的输入事件。
 ///
 /// `x`/`y` 是 0..1 的归一化坐标。前端按自己的显示尺寸算好再发，
@@ -1132,9 +1166,13 @@ pub enum InputEvent {
     Key {
         kind: String,
         key: String,
-        #[serde(default)]
+        /// 物理键位（如 "Digit1"）。可以不给，也可以给 null——
+        /// 前端拿不到 code 时普遍会传 null，而 `#[serde(default)]`
+        /// 只认「字段缺失」，不认「字段是 null」，那样整条按键会被
+        /// 反序列化拒掉、静默丢掉。用 Option 收下来再兜底。
+        #[serde(default, deserialize_with = "null_as_default")]
         code: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         vk: i64,
     },
     Text {

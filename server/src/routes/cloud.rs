@@ -191,7 +191,11 @@ async fn handle(socket: WebSocket, state: AppState, target: &'static crate::clou
                     }
                 }
                 Err(e) => {
-                    tracing::debug!(error = %e, raw = %text.chars().take(120).collect::<String>(), "无法解析的输入事件");
+                    // 用 warn 而不是 debug：这条以前是 debug，结果
+                    // 前端传了 `code: null` 导致所有按键被丢掉，
+                    // 而生产日志里什么都看不见——用户只觉得"打字没反应"。
+                    // 输入事件是用户直接感知的，丢了必须能被发现。
+                    tracing::warn!(error = %e, raw = %text.chars().take(120).collect::<String>(), "无法解析的输入事件，已丢弃");
                 }
             }
         }

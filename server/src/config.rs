@@ -173,6 +173,24 @@ impl Config {
                     .unwrap_or_else(|| std::env::temp_dir().join("speaklab-cloud")),
                 port_base: env_usize("SPEAKLAB_CLOUD_PORT", 9222).clamp(1024, 65000) as u16,
                 quality: env_usize("SPEAKLAB_CLOUD_QUALITY", 60).clamp(10, 100) as u8,
+                // 默认 480x320。**这个是量出来的，不是拍的。**
+                //
+                // 云游戏的移动版页面用固定像素布局，不跟视口宽度走：
+                // 实测 720x480 的手机号输入框还是 217px 宽，跟 480x320
+                // 时一模一样。所以提高分辨率**不会让表单变大**——
+                // 画面是等比缩放进卡片的，渲染得越宽，缩得越小：
+                //
+                //   渲染 480 宽 -> 卡片里缩放 1.27x -> LABEL 显示 405px
+                //   渲染 720 宽 -> 卡片里缩放 0.84x -> LABEL 显示 270px
+                //   渲染 960 宽 -> 卡片里缩放 0.63x -> LABEL 显示 203px
+                //
+                // 「同意用户协议」那个复选框本身就 0x0，全靠外层
+                // 320x32 的 LABEL 承接触摸。480 时它显示成 405px 宽，
+                // 手机上（卡片约 360px）也有 240px，手指点得中；
+                // 720 就只剩 160px 了，容易点偏。
+                //
+                // 所以取 480x320：触控优先。想更清楚就把卡片加宽
+                // （卡片越宽，同一个画面缩放越大），不要动这个值。
                 max_width: env_usize("SPEAKLAB_CLOUD_WIDTH", 480).clamp(160, 1920) as u32,
                 max_height: env_usize("SPEAKLAB_CLOUD_HEIGHT", 320).clamp(120, 1080) as u32,
                 // 上限给到 1 天。0 是有意义的取值（不自动回收），

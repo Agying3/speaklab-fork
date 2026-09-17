@@ -56,6 +56,8 @@ const CloudCard = (() => {
       lastFrameAt: 0,
       reconnectTimer: null,
       reconnectCount: 0,
+      frameW: 0,             // 远端画面尺寸，算点击坐标要用（见 norm）
+      frameH: 0,
       pressedKeys: new Set(),  // 按下的键，避免 keydown 重复触发
       lastTouchId: 0,
       sleeping: false,       // 页面切到后台了（后端那边已休眠）
@@ -74,13 +76,40 @@ const CloudCard = (() => {
   }
 
   /* 把浏览器事件换算成 0..1 的归一化坐标。
-     用 getBoundingClientRect 拿到卡片在视口里的实际位置，
-     再除以宽高。超出 0..1 的一律夹住——后端浏览器收到越界
-     坐标会报错，虽然不致命但没必要。 */
+     ------------------------------------------------------------
+     这里**不能**直接拿卡片的宽高去除。画面是 object-fit:contain，
+     卡片比例跟画面比例不一致时会留黑边，黑边上的点击换算过去
+     就偏了（可能差几十像素，云游戏里就是点不中按钮）。
+
+     正确做法是先算出「画面在卡片里实际占的那块矩形」：
+     用画面自身的宽高比（frameW/frameH）跟卡片比，
+     谁更"扁"就以谁为准，另一边居中留边。
+     卡片恰好同比例时（比如 608x405 对 480x320，都是 1.5）
+     算出来就等于整个卡片，跟旧行为一致。 */
   function norm(card, ev){
     const r = card.el.getBoundingClientRect();
-    const x = (ev.clientX - r.left) / (r.width || 1);
-    const y = (ev.clientY - r.top) / (r.height || 1);
+    const cw = r.width || 1;
+    const ch = r.height || 1;
+
+    // 没有画面信息时退回按整张卡片算——总比不响应强
+    const fw = card.frameW || 0;
+    const fh = card.frameH || 0;
+    if(!fw || !fh){
+      return {
+        x: Math.min(1, Math.max(0, (ev.clientX - r.left) / cw)),
+        y: Math.min(1, Math.max(0, (ev.clientY - r.top) / ch)),
+      };
+    }
+
+    // contain：画面按自身比例缩放，完整放进卡片
+    const scale = Math.min(cw / fw, ch / fh);
+    const dw = fw * scale;          // 画面实际显示宽
+    const dh = fh * scale;          // 画面实际显示高
+    const ox = (cw - dw) / 2;       // 左右黑边
+    const oy = (ch - dh) / 2;       // 上下黑边
+
+    const x = (ev.clientX - r.left - ox) / (dw || 1);
+    const y = (ev.clientY - r.top - oy) / (dh || 1);
     return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
   }
 
@@ -129,6 +158,8 @@ const CloudCard = (() => {
           // 用真实画面比例撑开卡片，避免黑边或拉伸。
           // 拉伸会让点击坐标对不上，所以用 aspect-ratio 而不是固定高。
           if(m.width && m.height){
+            card.frameW = m.width;
+            card.frameH = m.height;
             card.el.style.aspectRatio = `${m.width} / ${m.height}`;
           }
           break;
@@ -217,21 +248,33 @@ const CloudCard = (() => {
     }, { passive:false });
 
     /* 键盘。卡片获得焦点后才收键，不影响页面上别处的输入。
-       云游戏要账号密码，所以字符输入必须支持。 */
+       云游戏要账号密码，所以字符输入必须支持。
+
+       code/vk 都做了兜底：e.code 在某些输入法或老浏览器下是
+       undefined，JSON 化之后变成字段缺失，而后端曾经因为收到
+       `code: null` 把整条按键丢掉（日志还是 debug 级，什么都看不见）。
+       后端现在两种都收，这里也保证别送 null 过去。 */
+    const keyMsg = (kind, e) => ({
+      type:'key', kind,
+      key: e.key || '',
+      code: e.code || '',
+      vk: e.keyCode || 0,
+    });
+
     el.addEventListener('keydown', (e) => {
       // 让 Tab 能离开卡片，不然键盘用户被困住
       if(e.key === 'Tab') return;
       e.preventDefault();
       if(card.pressedKeys.has(e.code)) return;   // 系统重复的 keydown 丢掉
       card.pressedKeys.add(e.code);
-      send(card, { type:'key', kind:'down', key:e.key, code:e.code, vk:e.keyCode || 0 });
+      send(card, keyMsg('down', e));
     });
 
     el.addEventListener('keyup', (e) => {
       if(e.key === 'Tab') return;
       e.preventDefault();
       card.pressedKeys.delete(e.code);
-      send(card, { type:'key', kind:'up', key:e.key, code:e.code, vk:e.keyCode || 0 });
+      send(card, keyMsg('up', e));
     });
 
     // 卡片里的输入法/粘贴。用 beforeinput 拿不到完整串，直接监听 paste
@@ -246,7 +289,7 @@ const CloudCard = (() => {
     // 失焦时把按下的键全松开，否则切走再回来会一直"按着"
     el.addEventListener('blur', () => {
       for(const code of card.pressedKeys){
-        send(card, { type:'key', kind:'up', key:'', code, vk:0 });
+        send(card, { type:'key', kind:'up', key:'', code: code || '', vk:0 });
       }
       card.pressedKeys.clear();
     });
