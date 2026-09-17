@@ -775,18 +775,31 @@ main{position:relative;z-index:1}
         </div>
       </div>
       <!-- 云游戏卡片。后端没有 cloud_games 能力时 CloudCard.init() 会把它们藏起来。
-           卡片上不放任何文字标签，提示只在连接状态变化时临时出现。
-           两张卡按顺序往下排：云原神、云崩铁。
+           卡片上不放文字标签（跟小恐龙一个规矩）：没打开时看到的是一张海报
+           加一个 ▶ 角标，连上以后海报被画面盖住。
+           排布见 cloud.css：前两张跨两列，云·鸣潮只占一列，
+           正好填进前两张跨列之后留下的那个空位（三列网格，296px 一列）。
            没有云异环——那个入口（yh.wanmei.com/cloud/）实测是 514，
            它是《异环》官网不是云游戏，做了就是个点了报错的死链。 -->
       <div class="entry" id="cloudCard" role="button" tabindex="0"
            aria-label="云·原神：点一下在卡片里玩" hidden>
+        <img class="cloud-poster" src="cloud/posters/genshin.webp" alt="" aria-hidden="true">
         <img class="cloud-screen" alt="" aria-hidden="true">
+        <span class="cloud-play" aria-hidden="true"></span>
         <div class="cloud-status" role="status" aria-live="polite"></div>
       </div>
       <div class="entry" id="cloudCardStar" role="button" tabindex="0"
            aria-label="云·星穹铁道：点一下在卡片里玩" hidden>
+        <img class="cloud-poster" src="cloud/posters/starrail.webp" alt="" aria-hidden="true">
         <img class="cloud-screen" alt="" aria-hidden="true">
+        <span class="cloud-play" aria-hidden="true"></span>
+        <div class="cloud-status" role="status" aria-live="polite"></div>
+      </div>
+      <div class="entry" id="cloudCardMC" role="button" tabindex="0"
+           aria-label="云·鸣潮：点一下在卡片里玩" hidden>
+        <img class="cloud-poster" src="cloud/posters/mingchao.jpg" alt="" aria-hidden="true">
+        <img class="cloud-screen" alt="" aria-hidden="true">
+        <span class="cloud-play" aria-hidden="true"></span>
         <div class="cloud-status" role="status" aria-live="polite"></div>
       </div>
     </div>

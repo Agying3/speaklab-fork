@@ -46,12 +46,29 @@ pub const TARGETS: &[Target] = &[
         mobile_user_agent: "Mozilla/5.0 (Linux; Android 12.0; Pixel 5) AppleWebKit/537.36 \
                             (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
     },
-    // 下面两个还没验证过，先把入口占上。加的时候只需要确认
-    // url 和移动版地址对不对，会话逻辑一行都不用改。
     Target {
         name: "starrail",
         title: "云·星穹铁道",
         url: "https://sr.mihoyo.com/cloud/",
+        mobile_user_agent: "Mozilla/5.0 (Linux; Android 12.0; Pixel 5) AppleWebKit/537.36 \
+                            (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    },
+    // 云·鸣潮（库洛）。实测这是除了米哈游那两路之外少数真能在
+    // 浏览器里玩的云游戏：页面有「开始游戏」，点下去在浏览器里串流。
+    //
+    // 试过但做不了的，记在这里免得以后又去踩：
+    //   云·火影忍者  START 里有（gameId 700724），但它的网页详情页
+    //                只是个宣传页——点「登录后游玩」在浏览器里什么都
+    //                不发生，canonical 的 jump_url 是
+    //                `start://start.tencent.com/game_detail`，也就是
+    //                必须装腾讯 START 客户端。纯浏览器串流起不来。
+    //   云·绝区零 / 云·崩坏3   zzz.mihoyo.com/m/cloud/ 和
+    //                bh3.mihoyo.com/m/cloud/ 都是 404，米哈游只有
+    //                原神和星铁有网页云版。
+    Target {
+        name: "mingchao",
+        title: "云·鸣潮",
+        url: "https://mc.kurogames.com/cloud/",
         mobile_user_agent: "Mozilla/5.0 (Linux; Android 12.0; Pixel 5) AppleWebKit/537.36 \
                             (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
     },

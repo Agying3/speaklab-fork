@@ -20,8 +20,13 @@
    为什么没有云异环：后端 TARGETS 里有 yihuan，但那个入口
    （yh.wanmei.com/cloud/）实测返回 HTTP 514 Frequency Capped，
    它是《异环》官网而不是云游戏入口。做了就是个点了报错的死链，
-   所以这里只挂真能用的两个。idl 保留双卡结构，将来异环真出了
-   云端入口，加一行 targets 就行。
+   所以这里不挂。后端保留那一条是给以后留位，等真出了云端入口
+   再加一行 CARDS 就行。
+
+   为什么没有云火影忍者：START 里确实有（gameId 700724），但它的
+   网页详情页只是宣传页——点「登录后游玩」在浏览器里什么都没发生，
+   canonical 的 jump_url 是 `start://start.tencent.com/...`，
+   也就是必须装腾讯 START 客户端。纯浏览器起不了串流，做不了。
    ============================================================ */
 'use strict';
 
@@ -34,10 +39,12 @@ const CloudCard = (() => {
 
   /* 页面上有几张卡，以及每张卡对应后端哪个 target。
      顺序就是它们在各自主容器里的排列顺序。
-     加新卡片：这里加一项 + index.html 里加一个对应的 .cloud-card。 */
+     加新卡片：这里加一项 + index.html 里加一个对应的卡片 div
+     （class 带 cloud-poster / cloud-screen / cloud-play / cloud-status）。 */
   const CARDS = [
-    { el: 'cloudCard',      target: 'genshin'  },
-    { el: 'cloudCardStar',  target: 'starrail' },
+    { el: 'cloudCard',      target: 'genshin'   },
+    { el: 'cloudCardStar',  target: 'starrail'  },
+    { el: 'cloudCardMC',    target: 'mingchao'  },
   ];
 
   /* ---------------- 单个卡片的实例状态 ----------------

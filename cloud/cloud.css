@@ -5,14 +5,19 @@
    跑出来的 JPEG 帧，通过 WebSocket 推过来，这里只负责显示
    和把鼠标/触摸/键盘事件发回去。
 
-   整张卡片不放任何文字（跟小恐龙卡片一个规矩）。
+   整张卡片不放文字（跟小恐龙卡片一个规矩）：
+   没打开时是一张海报 + 一个 ▶ 角标，连上以后海报被画面盖住。
 
    选择器用属性前缀 [id^="cloudCard"] 而不是列 id：
-   现在有两张卡（云原神、云崩铁），以后可能还有更多，
-   加卡时不用回来改样式。
+   加卡时不用回来改样式，例外是云·鸣潮那张要单独覆盖列宽。
+
+   三张卡的排布（三列网格，列宽 296px）：
+     第2行  恐龙卡(1列) + 云原神(跨2列)  →  空出第3列
+     第3行  云崩铁(跨2列) + 云·鸣潮(1列)  →  刚好补上那个空位
+   所以云·鸣潮不跨列，这是刻意的，不是漏了。
    ============================================================ */
 
-/* 卡片本体：比普通入口卡大，画面顶满 */
+/* 卡片本体 */
 [id^="cloudCard"]{
   position:relative;
   overflow:hidden;
@@ -20,6 +25,11 @@
   display:block;
   cursor:pointer;
   background:#0d1117;         /* 画面没到之前先给个底色，避免白闪 */
+
+  /* 3:2 —— 跟后端画面（480x320）完全一致。
+     两处都对上之后，海报、画面、点击坐标三者不会互相错位：
+     画面宽 100% 高 auto 算出来正好填满，不留黑边也不用裁。 */
+  aspect-ratio:3 / 2;
 
   /* 比普通入口卡宽：跨两列。
      .entry-grid 是 repeat(auto-fit, minmax(240px, 1fr))，宽屏 3 列，
@@ -34,10 +44,44 @@
   align-self:start;
 }
 
+/* 恐龙卡别被云游戏卡撑高。
+   ------------------------------------------------------------
+   云游戏卡现在一加载就按 3:2 占满 405px（海报需要那个尺寸才能看），
+   而恐龙卡默认会被同一行的网格拉到一样高——它里面只有一个
+   150px 高的游戏区，拉高之后就是一大片空白，看上去像坏了。
+   让它保持自己的高度，多出来的空间留成普通的行间距。
+
+   这个规则放在这里而不是 dino.css：起因是云游戏卡变高了，
+   恐龙卡自己没问题。dino.css 不该知道云游戏的存在。 */
+#dinoCard{align-self:start}
+
+/* 云·鸣潮：**不跨列**，只占一列。
+   ------------------------------------------------------------
+   前两张跨两列，在三列网格里每行都会空出第三列——那就是首页上
+   那块空白。这张占一列正好补上，另两张的布局一行都不用动。
+   代价是它只有 296px 宽（画面 296x197），比另两张小。
+   id 选择器优先级高于上面的属性选择器，所以能盖住 span 2。 */
+#cloudCardMC{grid-column:auto}
+
+/* 海报。没打开时给用户看的东西，不然卡片是一块黑。
+   绝对定位铺满卡片，画面（下面的 .cloud-screen）盖在它上面。 */
+[id^="cloudCard"] .cloud-poster{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;           /* 原图 1911x960 约 2:1，按 3:2 裁两侧 */
+  object-position:center;
+  display:block;
+  pointer-events:none;
+  transition:opacity .3s ease;
+}
+
 /* 画面。后端给的是 480x320，用 object-fit 保证不变形：
    卡片比例跟 3:2 不一致时，宁可留黑边也不要拉伸，
    否则云游戏里的按钮位置会跟实际点击坐标对不上。 */
 [id^="cloudCard"] .cloud-screen{
+  position:relative;          /* 站到海报上面去（同为定位元素时按文档序） */
   display:block;
   width:100%;
   height:auto;                /* 跟着 aspect-ratio 走，不强行撑高 */
@@ -45,6 +89,39 @@
   object-position:center;
   pointer-events:none;        /* 事件统一挂卡片上，这里不抢 */
 }
+
+/* ▶ 角标。卡片上不能写字，所以用个图形告诉用户"这里能点"。
+   只在没连上的时候出现。 */
+[id^="cloudCard"] .cloud-play{
+  position:absolute;
+  left:50%; top:50%;
+  width:46px; height:46px;
+  margin:-23px 0 0 -23px;
+  border-radius:50%;
+  background:rgba(13,17,23,.55);
+  border:1px solid rgba(255,255,255,.38);
+  backdrop-filter:blur(2px);
+  pointer-events:none;
+  transition:opacity .25s ease, transform .25s ease;
+}
+/* 三角形用 border 画，不用字符——省得字体不同长得不一样 */
+[id^="cloudCard"] .cloud-play::after{
+  content:'';
+  position:absolute;
+  left:50%; top:50%;
+  width:0; height:0;
+  margin:-7px 0 0 -5px;       /* 三角形重心偏左，往右挪半个像素级修正 */
+  border-style:solid;
+  border-width:7px 0 7px 12px;
+  border-color:transparent transparent transparent #fff;
+}
+
+/* 出画面之后海报和 ▶ 都让位 */
+[id^="cloudCard"].cloud-live .cloud-poster,
+[id^="cloudCard"].cloud-live .cloud-play{opacity:0}
+
+/* 悬停时 ▶ 稍微大一点，给点反馈 */
+[id^="cloudCard"]:hover .cloud-play{transform:scale(1.08)}
 
 /* 连接中 / 出错时的提示。平时隐藏。 */
 [id^="cloudCard"] .cloud-status{
@@ -59,6 +136,7 @@
   transition:opacity .25s ease;
   pointer-events:none;
   text-align:center;
+  z-index:2;                  /* 压在画面/海报之上 */
 }
 [id^="cloudCard"].cloud-msg .cloud-status{opacity:1}
 
@@ -86,19 +164,23 @@
    这项目本来就要求新浏览器（pointer 事件、aspect-ratio、WebSocket）。 */
 .entry-grid:has(> [id^="cloudCard"]){grid-auto-rows:auto}
 
-/* 窄屏只有一列，跨两列会溢出 */
+/* 窄屏只有一列，跨两列会溢出。顺带恢复高度自适应——
+   一列时卡片会占满宽度，3:2 会变得很高（390px 宽的屏上是 260px），
+   可以接受；但云·鸣潮那张本来就只有一列，这里一并管住。 */
 @media (max-width:720px){
   [id^="cloudCard"]{grid-column:auto}
+  #cloudCardMC{grid-column:auto}
 }
 
-/* 画面还没到时给个高度，别让卡片塌成一条线。
-   有了真实画面后 aspect-ratio 会接管，这个 min-height 就不起作用了。 */
+/* 海报还没加载出来的时候别让卡片塌成一条线 */
 [id^="cloudCard"]{min-height:150px}
 @media (max-width:720px){
   [id^="cloudCard"]{min-height:120px}
 }
 
-/* 尊重"减少动效"偏好：状态提示不做淡入淡出 */
+/* 尊重"减少动效"偏好：状态提示和角标不做过渡 */
 @media (prefers-reduced-motion:reduce){
-  [id^="cloudCard"] .cloud-status{transition:none}
+  [id^="cloudCard"] .cloud-status,
+  [id^="cloudCard"] .cloud-play,
+  [id^="cloudCard"] .cloud-poster{transition:none}
 }
