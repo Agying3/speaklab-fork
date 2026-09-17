@@ -774,10 +774,18 @@ main{position:relative;z-index:1}
           <div class="interstitial-wrapper"></div>
         </div>
       </div>
-      <!-- 云游戏卡片。后端没有 cloud_games 能力时 CloudCard.init() 会把它藏起来。
-           卡片上不放任何文字标签，提示只在连接状态变化时临时出现。 -->
+      <!-- 云游戏卡片。后端没有 cloud_games 能力时 CloudCard.init() 会把它们藏起来。
+           卡片上不放任何文字标签，提示只在连接状态变化时临时出现。
+           两张卡按顺序往下排：云原神、云崩铁。
+           没有云异环——那个入口（yh.wanmei.com/cloud/）实测是 514，
+           它是《异环》官网不是云游戏，做了就是个点了报错的死链。 -->
       <div class="entry" id="cloudCard" role="button" tabindex="0"
-           aria-label="云游戏：点一下在卡片里玩" hidden>
+           aria-label="云·原神：点一下在卡片里玩" hidden>
+        <img class="cloud-screen" alt="" aria-hidden="true">
+        <div class="cloud-status" role="status" aria-live="polite"></div>
+      </div>
+      <div class="entry" id="cloudCardStar" role="button" tabindex="0"
+           aria-label="云·星穹铁道：点一下在卡片里玩" hidden>
         <img class="cloud-screen" alt="" aria-hidden="true">
         <div class="cloud-status" role="status" aria-live="polite"></div>
       </div>
