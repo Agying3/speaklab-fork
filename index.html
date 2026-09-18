@@ -1133,6 +1133,28 @@ function toast(msg, ms=2600){
   el.className='toast'; el.textContent=msg; w.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),320); }, ms);
 }
+/* 双击打开 index.html（file://）算不算安全上下文，各浏览器不一致；而且
+   就算 getUserMedia 存在，Chrome/Edge 在 file:// 下也会直接拒掉麦克风。
+   issue #1 报的就是这个：用户双击打开、点录音、什么提示都没有。
+   这里给一个能说清楚的提示，而不是让他对着没反应的按钮发呆。 */
+function micBlockedReason(){
+  // 没有 API：浏览器太老或不在安全上下文
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    return location.protocol==='file:'
+      ? '当前是双击打开的本地文件，浏览器不允许在本页录音。请用本地服务器打开：在仓库目录运行 npx serve . 或 python -m http.server，然后访问 http://localhost:8000/'
+      : '当前浏览器不支持麦克风录音，已启用文本模式。';
+  }
+  if(!window.isSecureContext){
+    return '当前页面不是安全上下文（https 或 localhost），浏览器不会授权麦克风。请改用 http://localhost 打开。';
+  }
+  return '';
+}
+function toastOnce(key, msg, ms){
+  if(toastOnce._seen[key]) return;
+  toastOnce._seen[key]=1;
+  toast(msg, ms);
+}
+toastOnce._seen = Object.create(null);
 function openModal(html){
   const root=$('#modalRoot');
   root.innerHTML = `<div class="modal-back" role="dialog" aria-modal="true"><div class="modal" role="document">${html}</div></div>`;
@@ -1438,7 +1460,24 @@ const Recorder = {
   silentSince:null, state:'idle',
   supported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); },
   async start({onLevel}={}){
-    this.stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    // file:// 或非安全上下文下，先给出能看懂的提示再抛错（issue #1）
+    const blocked = (typeof micBlockedReason==='function') ? micBlockedReason() : '';
+    if(blocked){ toast(blocked, 6000); throw new Error(blocked); }
+    try{
+      this.stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    }catch(err){
+      const name = err && err.name || '';
+      let hint = '拿不到麦克风权限';
+      if(name==='NotAllowedError' || name==='SecurityError'){
+        hint = '麦克风权限被拒绝。请点地址栏左侧的图标允许麦克风，然后重试。';
+      }else if(name==='NotFoundError' || name==='DevicesNotFoundError'){
+        hint = '没有找到可用的麦克风设备。';
+      }else if(name==='NotReadableError' || name==='TrackStartError'){
+        hint = '麦克风被其他程序占用了（比如会议软件），关掉之后再试。';
+      }
+      toast(hint + (err && err.message ? '（' + err.message + '）' : ''), 6000);
+      throw err;
+    }
     this.chunks=[]; this.t0=performance.now(); this.silMs=0; this.silentSince=null;
     const types=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
     this.mime = (types.find(t=>{ try{ return MediaRecorder.isTypeSupported(t); }catch(e){ return false; } })) || '';
@@ -3993,6 +4032,11 @@ function initNav(){
     cancelAnimationFrame(tkRaf);
     tkRaf=requestAnimationFrame(()=>Ticker.resize());
   });
+
+  /* 双击打开 index.html 的用户，录音一定是坏的（issue #1）。
+     与其等他点了跟读才发现没反应，不如一进来就说清楚怎么办。 */
+  const micIssue = (typeof micBlockedReason==='function') ? micBlockedReason() : '';
+  if(micIssue) setTimeout(()=>toastOnce('mic', micIssue, 9000), 900);
 }
 
 <!-- [dino] injected -->
