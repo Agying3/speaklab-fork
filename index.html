@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="data:,">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F2EEE4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SpeakLab">
+<meta name="description" content="跟读打分、音标闯关、场景对话。纯前端单文件，不依赖任何第三方库。">
 <title>SpeakLab · 开口录音棚 — 英语口语练习</title>
 <style>
 /* ============================================================
@@ -4050,6 +4058,18 @@ Backend.probe().then(ok => {
      所以放在这里而不是 init() 里。没后端时 init() 会把卡片藏起来。 */
   try{ if(typeof CloudCard!=='undefined') CloudCard.init(); }catch(e){ console.warn('[cloud] 初始化失败', e); }
 });
+
+/* Service worker：让页面能离线打开、能「添加到主屏幕」。
+   只在 http(s) 下注册 —— file:// 打不开 SW，而且双击打开本来就用不了录音。
+   注册失败不影响任何功能，所以只 warn 不弹提示。 */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(
+      reg => console.info('[sw] 已注册，scope = ' + reg.scope),
+      err => console.warn('[sw] 注册失败（不影响使用）:', err && err.message),
+    );
+  });
+}
 </script>
 <!-- T-Rex runner assets. BSD-3-Clause, from wayou/t-rex-runner (see dino/LICENSE). -->
 <div id="offline-resources" class="hidden" aria-hidden="true">
